@@ -20,6 +20,7 @@ You need:
 - `BLOB_READ_WRITE_TOKEN` — Vercel Blob
 - `OPENAI_API_KEY` — Whisper + captions
 - `SITE_PASSWORD` — the shared gate for her site
+- `GATHER_TOKEN` — secret path for the mom invite page (`/gather/<token>`)
 
 2. Install and push schema:
 
@@ -28,20 +29,15 @@ npm install
 npm run db:push
 ```
 
-3. Seed invite links (edit the list in `scripts/seed.ts` first):
-
-```bash
-npm run seed
-```
-
-4. Run locally:
+3. Run locally (or deploy to Vercel):
 
 ```bash
 npm run dev
 ```
 
-Contributor upload: `http://localhost:3000/send/<token>`  
-Her site: `http://localhost:3000` (password-gated)
+Mom’s invite board: `https://your-domain/gather/<GATHER_TOKEN>`  
+Contributor upload: `/send/<invite-token>` (generated on the gather page)  
+Her site: `/` (password-gated)
 
 ## Collection first
 

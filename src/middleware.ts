@@ -5,11 +5,13 @@ const AUTH_COOKIE = "kelli_gate";
 
 const PUBLIC_PREFIXES = [
   "/send",
+  "/gather",
   "/login",
   "/api/blob",
   "/api/media",
   "/api/auth",
   "/api/contributor",
+  "/api/gather",
 ];
 
 export function middleware(request: NextRequest) {
