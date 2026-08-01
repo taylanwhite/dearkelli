@@ -54,6 +54,11 @@ export const media = pgTable(
     caption: text("caption"),
     originalFilename: text("original_filename"),
     isTest: boolean("is_test").notNull().default(false),
+    /** How many times Kelli opened / played this on the site. */
+    viewCount: integer("view_count").notNull().default(0),
+    lastViewedAt: timestamp("last_viewed_at", { withTimezone: true }),
+    /** Set when AI enrichment fails; media still shows on the site. */
+    processingError: text("processing_error"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -62,6 +67,7 @@ export const media = pgTable(
     index("media_contributor_id_idx").on(table.contributorId),
     index("media_status_idx").on(table.status),
     index("media_is_test_idx").on(table.isTest),
+    index("media_view_count_idx").on(table.viewCount),
   ],
 );
 

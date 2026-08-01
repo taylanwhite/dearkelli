@@ -65,15 +65,24 @@ function extractAudio(
   ffmpeg: typeof import("fluent-ffmpeg"),
   inputPath: string,
   outputPath: string,
+  opts?: { maxSeconds?: number },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    ffmpeg(inputPath)
+    let cmd = ffmpeg(inputPath)
       .noVideo()
       .audioChannels(1)
       .audioFrequency(16000)
       .audioCodec("libmp3lame")
       .audioBitrate("64k")
       .format("mp3")
+      .outputOptions(["-vn", "-map_metadata", "-1"]);
+
+    // Cap length so huge phone videos still yield a Whisper-sized MP3.
+    if (opts?.maxSeconds && opts.maxSeconds > 0) {
+      cmd = cmd.duration(opts.maxSeconds);
+    }
+
+    cmd
       .on("end", () => resolve())
       .on("error", reject)
       .save(outputPath);
@@ -346,6 +355,35 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
       themes,
       tags: tags.length ? tags : null,
       status: "ready",
+      processingError: null,
+    })
+    .where(eq(media.id, item.id));
+}
+
+async function markVisibleWithoutAi(
+  item: Media,
+  opts: {
+    error: string;
+    duration?: number | null;
+    posterUrl?: string | null;
+  },
+) {
+  await db
+    .update(media)
+    .set({
+      status: "ready",
+      processingError: opts.error.slice(0, 1000),
+      durationSeconds: opts.duration
+        ? Math.round(opts.duration)
+        : item.durationSeconds,
+      posterUrl: opts.posterUrl ?? item.posterUrl,
+      title:
+        item.title ||
+        (item.kind === "audio"
+          ? "A voice for Kelli"
+          : item.kind === "image"
+            ? "A photo for Kelli"
+            : "A message for Kelli"),
     })
     .where(eq(media.id, item.id));
 }
@@ -405,34 +443,56 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       }
     }
 
-    // Whisper 25MB limit; downsample when needed
+    // Whisper 25MB limit — always pull a compact soundtrack for video / big files.
     if (sourceSize > 20 * 1024 * 1024 || item.kind === "video") {
       try {
-        await extractAudio(ffmpeg, sourcePath, audioPath);
+        await extractAudio(ffmpeg, sourcePath, audioPath, {
+          maxSeconds: 5 * 60,
+        });
         transcriptPath = audioPath;
         transcriptName = "audio.mp3";
         transcriptMime = "audio/mpeg";
       } catch (err) {
         console.warn("Audio extract failed, trying source file", err);
         if (sourceSize > 25 * 1024 * 1024) {
-          throw new Error(
-            "File too large for transcription and audio extract failed",
-          );
+          await markVisibleWithoutAi(item, {
+            error:
+              "Couldn't pull audio for transcription (file too large). The video still shows for Kelli.",
+            duration,
+            posterUrl,
+          });
+          return;
         }
       }
     }
   } else if (sourceSize > 25 * 1024 * 1024) {
-    throw new Error(
-      "File exceeds Whisper 25MB limit and ffmpeg is unavailable",
-    );
+    await markVisibleWithoutAi(item, {
+      error:
+        "File is too large to transcribe without ffmpeg. It still shows for Kelli.",
+      duration,
+      posterUrl,
+    });
+    return;
   }
 
-  const transcript = await transcribeFile(
-    openai,
-    transcriptPath,
-    transcriptName,
-    transcriptMime,
-  );
+  let transcript: Awaited<ReturnType<typeof transcribeFile>>;
+  try {
+    transcript = await transcribeFile(
+      openai,
+      transcriptPath,
+      transcriptName,
+      transcriptMime,
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn("Transcription failed", err);
+    await markVisibleWithoutAi(item, {
+      error: `Transcription failed: ${message}`,
+      duration,
+      posterUrl,
+    });
+    return;
+  }
 
   const timed: TimedWord[] = (transcript.words || []).map((w) => ({
     raw: w.word,
@@ -446,17 +506,33 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
   );
   const detected = detectPhrases(timed);
 
-  const enrichment = transcript.text.trim()
-    ? await enrichFromText(openai, transcript.text)
-    : {
-        title:
-          item.kind === "audio" ? "A voice for Kelli" : "A message for Kelli",
-        summary: null as string | null,
-        themes: [] as string[],
-        tags: [] as string[],
-      };
+  let enrichment: {
+    title: string;
+    summary: string | null;
+    themes: string[];
+    tags: string[];
+  };
+  try {
+    enrichment = transcript.text.trim()
+      ? await enrichFromText(openai, transcript.text)
+      : {
+          title:
+            item.kind === "audio" ? "A voice for Kelli" : "A message for Kelli",
+          summary: null,
+          themes: [],
+          tags: [],
+        };
+  } catch (err) {
+    console.warn("Text enrichment failed", err);
+    enrichment = {
+      title:
+        item.kind === "audio" ? "A voice for Kelli" : "A message for Kelli",
+      summary: null,
+      themes: [],
+      tags: [],
+    };
+  }
 
-  // Merge AI tags into word cloud (no supercut moments; timestamps already from speech)
   const priorTags = item.tags || [];
   const tags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
   const themes = (enrichment.themes || []).slice(0, 3);
@@ -464,7 +540,9 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
   const spokenNormalized = new Set(kept.map((w) => w.normalized));
-  const extraTags = aiTagWords.filter((w) => !spokenNormalized.has(w.normalized));
+  const extraTags = aiTagWords.filter(
+    (w) => !spokenNormalized.has(w.normalized),
+  );
 
   await db.delete(words).where(eq(words.mediaId, item.id));
   await db.delete(phrases).where(eq(phrases.mediaId, item.id));
@@ -525,6 +603,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     .update(media)
     .set({
       status: "ready",
+      processingError: null,
       durationSeconds: duration ? Math.round(duration) : item.durationSeconds,
       posterUrl,
       title: enrichment.title,
@@ -549,13 +628,15 @@ export async function processMediaById(id: string): Promise<{
     return { ok: true, status: "skipped", error: "Already processing" };
   }
 
-  if (item.status === "ready") {
+  // Skip only fully successful items. Ready-with-error can be requeued
+  // (requeue resets status to uploaded first).
+  if (item.status === "ready" && !item.processingError) {
     return { ok: true, status: "skipped", error: "Already ready" };
   }
 
   await db
     .update(media)
-    .set({ status: "processing" })
+    .set({ status: "processing", processingError: null })
     .where(eq(media.id, id));
 
   const openai = getOpenAI();
@@ -563,7 +644,16 @@ export async function processMediaById(id: string): Promise<{
 
   try {
     if (item.kind === "image") {
-      await processImage(item, workDir, openai);
+      try {
+        await processImage(item, workDir, openai);
+      } catch (err) {
+        // Image may still be viewable at the original blob URL.
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`process image soft-fail ${id}`, err);
+        await markVisibleWithoutAi(item, {
+          error: `Couldn't finish AI for this photo: ${message}`,
+        });
+      }
     } else {
       await processAv(item, workDir, openai);
     }
@@ -571,14 +661,12 @@ export async function processMediaById(id: string): Promise<{
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`process failed ${id}`, error);
-    await db
-      .update(media)
-      .set({ status: "failed" })
-      .where(eq(media.id, id));
+    // Never leave the attachment hidden — always ready for Kelli.
+    await markVisibleWithoutAi(item, { error: message });
     await writeFile(join(workDir, "error.txt"), message, "utf8").catch(
       () => undefined,
     );
-    return { ok: false, status: "failed", error: message };
+    return { ok: true, status: "ready", error: message };
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }

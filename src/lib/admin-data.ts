@@ -116,8 +116,12 @@ export async function getAdminMedia() {
       caption: media.caption,
       isTest: media.isTest,
       createdAt: media.createdAt,
+      viewCount: media.viewCount,
+      lastViewedAt: media.lastViewedAt,
+      processingError: media.processingError,
       contributorId: contributors.id,
       contributorName: contributors.name,
+      contributorAvatarUrl: contributors.avatarUrl,
     })
     .from(media)
     .innerJoin(contributors, eq(media.contributorId, contributors.id))

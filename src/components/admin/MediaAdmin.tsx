@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EnlargeableImage } from "@/components/EnlargeableImage";
+import { playableUrl } from "@/lib/blob";
 
 export type AdminMediaItem = {
   id: string;
@@ -19,13 +21,40 @@ export type AdminMediaItem = {
   caption: string | null;
   isTest: boolean;
   createdAt: string | Date;
+  viewCount: number;
+  lastViewedAt: string | Date | null;
+  processingError: string | null;
   contributorId: string;
   contributorName: string;
+  contributorAvatarUrl: string | null;
 };
 
 type Props = { initialMedia: AdminMediaItem[] };
 
-const FILTERS = ["all", "uploaded", "processing", "ready", "failed"] as const;
+const FILTERS = [
+  "all",
+  "uploaded",
+  "processing",
+  "ready",
+  "failed",
+  "ai issue",
+  "viewed",
+  "unviewed",
+] as const;
+
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function formatViews(count: number) {
+  if (count === 1) return "1 view";
+  return `${count} views`;
+}
 
 export function MediaAdmin({ initialMedia }: Props) {
   const router = useRouter();
@@ -33,10 +62,41 @@ export function MediaAdmin({ initialMedia }: Props) {
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const visible = useMemo(
-    () =>
-      filter === "all" ? items : items.filter((item) => item.status === filter),
-    [filter, items],
+  const visible = useMemo(() => {
+    let list = items;
+    if (filter === "viewed") {
+      list = items.filter((item) => item.viewCount > 0);
+    } else if (filter === "unviewed") {
+      list = items.filter((item) => item.viewCount === 0);
+    } else if (filter === "ai issue") {
+      list = items.filter((item) => Boolean(item.processingError));
+    } else if (filter !== "all") {
+      list = items.filter((item) => item.status === filter);
+    }
+
+    if (filter === "viewed" || filter === "ai issue") {
+      return [...list].sort(
+        (a, b) =>
+          b.viewCount - a.viewCount ||
+          String(b.lastViewedAt ?? "").localeCompare(
+            String(a.lastViewedAt ?? ""),
+          ),
+      );
+    }
+    return list;
+  }, [filter, items]);
+
+  const viewedCount = useMemo(
+    () => items.filter((i) => i.viewCount > 0).length,
+    [items],
+  );
+  const unviewedCount = useMemo(
+    () => items.filter((i) => i.viewCount === 0).length,
+    [items],
+  );
+  const aiIssueCount = useMemo(
+    () => items.filter((i) => Boolean(i.processingError)).length,
+    [items],
   );
 
   async function requeue(id: string) {
@@ -51,7 +111,9 @@ export function MediaAdmin({ initialMedia }: Props) {
       if (!res.ok) throw new Error(data.error || "Failed");
       setItems((prev) =>
         prev.map((item) =>
-          item.id === id ? { ...item, status: "uploaded" } : item,
+          item.id === id
+            ? { ...item, status: "uploaded", processingError: null }
+            : item,
         ),
       );
       router.refresh();
@@ -83,23 +145,32 @@ export function MediaAdmin({ initialMedia }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full px-3 py-1.5 text-xs capitalize ${
-              filter === f
-                ? "bg-[var(--gold)] text-[var(--ground)]"
-                : "border border-[var(--forest)]/15 text-[var(--cream)]/60"
-            }`}
-          >
-            {f}
-            {f !== "all"
-              ? ` (${items.filter((i) => i.status === f).length})`
-              : ` (${items.length})`}
-          </button>
-        ))}
+        {FILTERS.map((f) => {
+          const count =
+            f === "all"
+              ? items.length
+              : f === "viewed"
+                ? viewedCount
+                : f === "unviewed"
+                  ? unviewedCount
+                  : f === "ai issue"
+                    ? aiIssueCount
+                    : items.filter((i) => i.status === f).length;
+          return (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1.5 text-xs capitalize ${
+                filter === f
+                  ? "bg-[var(--gold)] text-[var(--ground)]"
+                  : "border border-[var(--forest)]/15 text-[var(--cream)]/60"
+              }`}
+            >
+              {f} ({count})
+            </button>
+          );
+        })}
       </div>
 
       {visible.length === 0 ? (
@@ -109,6 +180,9 @@ export function MediaAdmin({ initialMedia }: Props) {
           {visible.map((item) => {
             const tags = item.tags || [];
             const themes = item.themes || [];
+            const avatarSrc = item.contributorAvatarUrl
+              ? playableUrl(item.contributorAvatarUrl)
+              : null;
             return (
               <li
                 key={item.id}
@@ -139,31 +213,90 @@ export function MediaAdmin({ initialMedia }: Props) {
                   <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
                     {item.kind}
                   </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
-                      item.status === "ready"
-                        ? "bg-[var(--gold)]/20 text-[var(--gold)]"
-                        : item.status === "failed"
-                          ? "bg-[var(--forest)]/20 text-[var(--forest)]"
-                          : "bg-[var(--forest)]/10 text-[var(--cream)]/60"
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                  {item.isTest && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
+                          item.status === "ready" && !item.processingError
+                            ? "bg-[var(--gold)]/20 text-[var(--gold)]"
+                            : item.processingError || item.status === "failed"
+                              ? "bg-[var(--forest)]/20 text-[var(--forest)]"
+                              : "bg-[var(--forest)]/10 text-[var(--cream)]/60"
+                        }`}
+                      >
+                        {item.processingError ? "ready · ai issue" : item.status}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] tracking-wide ${
+                          item.viewCount > 0
+                            ? "bg-[var(--blush)]/15 text-[var(--blush)]"
+                            : "bg-[var(--forest)]/8 text-[var(--cream)]/40"
+                        }`}
+                      >
+                        {formatViews(item.viewCount)}
+                      </span>
+                      {item.isTest && (
                     <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--gold)]">
                       test
                     </span>
                   )}
                 </div>
 
-                <p className="mt-3 text-[var(--cream)]">
-                  {item.title || item.originalFilename || "Untitled"}
-                </p>
-                <p className="text-sm text-[var(--cream)]/45">
-                  {item.contributorName}
-                  {item.durationSeconds ? ` · ${item.durationSeconds}s` : ""}
-                </p>
+                    <p className="mt-3 text-[var(--cream)]">
+                      {item.title || item.originalFilename || "Untitled"}
+                    </p>
+
+                    {item.processingError ? (
+                      <div className="mt-3 rounded-xl border border-[var(--forest)]/25 bg-[var(--forest)]/10 px-3 py-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-[var(--forest)]">
+                          AI couldn&apos;t finish
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-[var(--cream)]/75">
+                          {item.processingError}
+                        </p>
+                        <p className="mt-1.5 text-xs text-[var(--cream)]/45">
+                          Still shown on their profile. Requeue to try AI again.
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/people/${item.contributorId}`}
+                    className="group inline-flex items-center gap-2.5"
+                    title={`Open ${item.contributorName}'s profile`}
+                  >
+                    <span className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--sage)] font-[family-name:var(--font-display)] text-sm text-[var(--ground)] ring-2 ring-[var(--rose)]/30 transition group-hover:ring-[var(--rose)]/60">
+                      {avatarSrc ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={avatarSrc}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        initials(item.contributorName)
+                      )}
+                    </span>
+                    <span className="text-sm text-[var(--cream)]/70 transition group-hover:text-[var(--cream)]">
+                      {item.contributorName}
+                    </span>
+                  </Link>
+                  {item.durationSeconds ? (
+                    <span className="text-sm text-[var(--cream)]/40">
+                      {item.durationSeconds}s
+                    </span>
+                  ) : null}
+                </div>
+                {item.lastViewedAt ? (
+                  <p className="mt-1 text-xs text-[var(--cream)]/35">
+                    Last opened{" "}
+                    {new Date(item.lastViewedAt).toLocaleString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                ) : null}
 
                 {(item.summary || item.caption) && (
                   <p className="mt-2 text-sm leading-relaxed text-[var(--cream)]/55">
@@ -213,7 +346,10 @@ export function MediaAdmin({ initialMedia }: Props) {
                   >
                     Open file
                   </a>
-                  {(item.status === "failed" || item.status === "ready") && (
+                  {(item.status === "failed" ||
+                    item.status === "ready" ||
+                    item.status === "uploaded" ||
+                    Boolean(item.processingError)) && (
                     <button
                       type="button"
                       disabled={busyId === item.id}

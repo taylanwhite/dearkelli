@@ -12,14 +12,17 @@ export default async function AdminMediaPage() {
       <div>
         <h1 className="text-2xl font-semibold text-[var(--cream)]">Uploads</h1>
         <p className="mt-1 text-sm text-[var(--cream)]/45">
-          Filter by status, open files, requeue for{" "}
-          <code className="text-[var(--cream)]/60">npm run process</code>, or delete.
+          Filter by status or what she&apos;s viewed. Open files, requeue, or
+          delete.
         </p>
       </div>
       <MediaAdmin
         initialMedia={items.map((item) => ({
           ...item,
           createdAt: item.createdAt.toISOString(),
+          lastViewedAt: item.lastViewedAt
+            ? item.lastViewedAt.toISOString()
+            : null,
         }))}
       />
     </div>

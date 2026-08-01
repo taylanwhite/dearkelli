@@ -25,6 +25,7 @@ export async function GET(request: Request) {
       createdAt: media.createdAt,
       contributorId: contributors.id,
       contributorName: contributors.name,
+      contributorAvatarUrl: contributors.avatarUrl,
     })
     .from(media)
     .innerJoin(contributors, eq(media.contributorId, contributors.id))

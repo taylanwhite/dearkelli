@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { recordMediaView } from "@/lib/record-view";
 
 export type LightboxPhoto = {
   id: string;
@@ -28,6 +29,11 @@ export function LightboxOverlay({
   onChangeIndex,
 }: Props) {
   const open = index != null ? photos[index] : null;
+  const openId = open?.id;
+
+  useEffect(() => {
+    if (openId) recordMediaView(openId);
+  }, [openId]);
 
   useEffect(() => {
     if (index == null) return;

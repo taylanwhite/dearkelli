@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonBubble } from "@/components/PersonBubble";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
+import { TrackedAvPlayer } from "@/components/TrackedAvPlayer";
 import { playableUrl } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
@@ -61,32 +62,17 @@ export default async function PersonPage({ params }: Props) {
       {spoken.length > 0 && (
         <section className="mt-14 space-y-10">
           {spoken.map((clip) => (
-            <article key={clip.id}>
-              {clip.kind === "video" ? (
-                <video
-                  src={playableUrl(clip.blobUrl)}
-                  poster={
-                    clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
-                  }
-                  controls
-                  playsInline
-                  className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
-                />
-              ) : (
-                <div className="rounded-2xl bg-[var(--surface)] px-5 py-8">
-                  <audio
-                    src={playableUrl(clip.blobUrl)}
-                    controls
-                    className="w-full"
-                  />
-                </div>
-              )}
-              {(clip.title || clip.summary) && (
-                <p className="mt-4 font-[family-name:var(--font-display)] text-lg leading-snug text-[var(--forest-deep)]">
-                  {clip.summary || clip.title}
-                </p>
-              )}
-            </article>
+            <TrackedAvPlayer
+              key={clip.id}
+              id={clip.id}
+              kind={clip.kind === "video" ? "video" : "audio"}
+              src={playableUrl(clip.blobUrl)}
+              poster={
+                clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
+              }
+              title={clip.title}
+              summary={clip.summary}
+            />
           ))}
         </section>
       )}

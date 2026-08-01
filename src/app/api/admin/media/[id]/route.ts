@@ -44,6 +44,9 @@ export async function PATCH(request: Request, { params }: Params) {
         status: body.requeue
           ? "uploaded"
           : (body.status ?? existing.status),
+        processingError: body.requeue
+          ? null
+          : existing.processingError,
         title: body.title === undefined ? existing.title : body.title,
         summary:
           body.summary === undefined ? existing.summary : body.summary,

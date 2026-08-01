@@ -7,7 +7,6 @@ import {
   transcripts,
   words,
 } from "@/db/schema";
-
 export async function getWordStats() {
   return db
     .select({
@@ -100,10 +99,7 @@ export async function getPeople() {
       clipCount: sql<number>`count(${media.id})::int`,
     })
     .from(contributors)
-    .leftJoin(
-      media,
-      and(eq(media.contributorId, contributors.id), eq(media.status, "ready")),
-    )
+    .leftJoin(media, eq(media.contributorId, contributors.id))
     .groupBy(contributors.id)
     .having(sql`count(${media.id}) > 0`)
     .orderBy(contributors.name);
@@ -118,10 +114,11 @@ export async function getPerson(id: string) {
 
   if (!person) return null;
 
+  // All attachments for this person — AI status never hides them.
   const clips = await db
     .select()
     .from(media)
-    .where(and(eq(media.contributorId, id), eq(media.status, "ready")))
+    .where(eq(media.contributorId, id))
     .orderBy(desc(media.createdAt));
 
   // Profile portraits are for the circle only, not the album.
@@ -137,6 +134,7 @@ export async function getPerson(id: string) {
   const topWordConditions = [
     eq(words.contributorId, id),
     eq(media.status, "ready"),
+    isNull(media.processingError),
   ];
   if (person.avatarUrl) {
     topWordConditions.push(
@@ -162,7 +160,6 @@ export async function getPerson(id: string) {
 export async function getPhotos(contributorId?: string) {
   const conditions = [
     eq(media.kind, "image"),
-    eq(media.status, "ready"),
     // Hide profile portraits from the album
     or(isNull(contributors.avatarUrl), ne(media.blobUrl, contributors.avatarUrl)),
   ];
@@ -254,7 +251,6 @@ export async function searchAll(query: string) {
         .where(
           and(
             eq(media.kind, "image"),
-            eq(media.status, "ready"),
             or(
               isNull(contributors.avatarUrl),
               ne(media.blobUrl, contributors.avatarUrl),

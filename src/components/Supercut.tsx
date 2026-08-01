@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EnlargeableImage } from "@/components/EnlargeableImage";
 import { PersonBubble } from "@/components/PersonBubble";
+import { recordMediaView } from "@/lib/record-view";
 
 export type SupercutClip = {
   id: string;
@@ -32,6 +33,10 @@ export function Supercut({ clips, label }: Props) {
   const [needsTap, setNeedsTap] = useState(true);
 
   const current = clips[index];
+
+  useEffect(() => {
+    if (current?.id) recordMediaView(current.id);
+  }, [current?.id]);
 
   useEffect(() => {
     setIndex(0);
