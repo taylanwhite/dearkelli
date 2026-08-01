@@ -34,6 +34,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
   }
 
+  // Processed assets (poster/thumb/full/playback) are immutable per URL, so
+  // let browsers keep them for a month. This is the biggest lever on repeat
+  // Blob Data Transfer cost: a re-watch/re-view is served from cache for free.
+  const isProcessed = url.includes("/processed/");
+  const cacheControl = isProcessed
+    ? "private, max-age=2592000, immutable"
+    : "private, max-age=86400";
+
   const range = request.headers.get("range") || undefined;
   const ifNoneMatch = request.headers.get("if-none-match") || undefined;
 
@@ -58,7 +66,7 @@ export async function GET(request: Request) {
       status: 304,
       headers: {
         ETag: result.blob.etag,
-        "Cache-Control": "private, max-age=3600",
+        "Cache-Control": cacheControl,
       },
     });
   }
@@ -75,7 +83,7 @@ export async function GET(request: Request) {
     "application/octet-stream";
   headers.set("Content-Type", contentType);
   headers.set("Accept-Ranges", "bytes");
-  headers.set("Cache-Control", "private, max-age=3600");
+  headers.set("Cache-Control", cacheControl);
   headers.set("X-Content-Type-Options", "nosniff");
 
   const etag = upstream.get("etag") || result.blob.etag;

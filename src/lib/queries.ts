@@ -7,8 +7,10 @@ import {
   transcripts,
   words,
 } from "@/db/schema";
+import { isCloudWorthyWord } from "@/lib/words";
+
 export async function getWordStats() {
-  return db
+  const rows = await db
     .select({
       normalized: words.normalized,
       totalCount: sql<number>`count(*)::int`,
@@ -20,6 +22,8 @@ export async function getWordStats() {
     .where(eq(media.status, "ready"))
     .groupBy(words.normalized)
     .orderBy(desc(sql`count(*)`));
+
+  return rows.filter((w) => isCloudWorthyWord(w.normalized));
 }
 
 export async function getPhraseStats() {
@@ -144,17 +148,21 @@ export async function getPerson(id: string) {
     );
   }
 
-  const topWords = await db
-    .select({
-      normalized: words.normalized,
-      totalCount: sql<number>`count(*)::int`,
-    })
-    .from(words)
-    .innerJoin(media, eq(words.mediaId, media.id))
-    .where(and(...topWordConditions))
-    .groupBy(words.normalized)
-    .orderBy(desc(sql`count(*)`))
-    .limit(24);
+  const topWords = (
+    await db
+      .select({
+        normalized: words.normalized,
+        totalCount: sql<number>`count(*)::int`,
+      })
+      .from(words)
+      .innerJoin(media, eq(words.mediaId, media.id))
+      .where(and(...topWordConditions))
+      .groupBy(words.normalized)
+      .orderBy(desc(sql`count(*)`))
+      .limit(80)
+  )
+    .filter((w) => isCloudWorthyWord(w.normalized))
+    .slice(0, 24);
 
   return { person, clips: albumClips, topWords };
 }
@@ -212,7 +220,10 @@ export async function searchAll(query: string) {
         )
         .groupBy(words.normalized)
         .orderBy(desc(sql`count(*)`))
-        .limit(20),
+        .limit(40)
+        .then((rows) =>
+          rows.filter((w) => isCloudWorthyWord(w.normalized)).slice(0, 20),
+        ),
       db
         .select({
           text: phrases.text,

@@ -22,14 +22,15 @@ import {
   THEME_TAGS,
   detectPhrases,
   filterWarmAiTags,
+  isCloudWorthyWord,
   normalizeWord,
   type TimedWord,
 } from "@/lib/words";
 
-const AI_TAG_GUIDANCE = `ONLY happy, loving, or deeply meaningful words she would want to see about herself.
-Feelings, virtues, warmth, relationship, belonging, joy. Never mundane objects, never neutral visual descriptors, never negative words.
-Good: love, laughter, home, brave, sister, always, sunshine, grateful, soft, forever, proud, gentle, family, heart, light
-Bad: table, shirt, outdoor, person, sad, phone, wall, crying`;
+const AI_TAG_GUIDANCE = `Word-cloud tags must be ONLY happy, thoughtful, loving keepsake words — feelings, virtues, gratitude, family bonds, joy.
+Never dump random words from the soundtrack or scene. Never negatives, body/sense words, objects, fillers, or baby-talk noise.
+Good: love, laughter, grateful, family, sunshine, brave, forever, proud, gentle, heart, home, joy, always, together
+Bad: smell, baby, hurt, robot, car, phone, crazy, hey, ready, go, wall, crying, sad, outdoor, person`;
 
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY;
@@ -76,6 +77,9 @@ type ExtractedAudio = {
 const PROCESSED_PUT = {
   access: BLOB_ACCESS,
   allowOverwrite: true as const,
+  // Processed assets are effectively immutable per URL; let the store/CDN
+  // hold them a full year so we don't re-pay origin transfer on every view.
+  cacheControlMaxAge: 60 * 60 * 24 * 365,
 };
 
 type AudioMapMode =
@@ -280,12 +284,18 @@ function createWebPlayback(
         "-hide_banner",
         "-nostdin",
         // Compact, web-friendly H.264 + AAC with moov at the front.
+        // Tuned for low data-transfer cost: ~720p cap, CRF 30, and a hard
+        // bitrate ceiling so high-motion phone footage can't balloon.
         "-c:v",
         "libx264",
         "-preset",
         "veryfast",
         "-crf",
-        "28",
+        "30",
+        "-maxrate",
+        "1600k",
+        "-bufsize",
+        "3200k",
         "-pix_fmt",
         "yuv420p",
         "-vf",
@@ -293,7 +303,7 @@ function createWebPlayback(
         "-c:a",
         "aac",
         "-b:a",
-        "128k",
+        "96k",
         "-ac",
         "2",
         "-movflags",
@@ -414,13 +424,13 @@ Rules for title and summary:
 - Title: max 6 words, concrete (e.g. "Kids by the red car"), not poetic filler.
 - Summary: 1-2 plain sentences about the real moment in the transcript.
 
-Word-cloud tags may be warmer, but only when they fit what was said.
+Tags: curated keepsake words only — not a transcript dump. ${AI_TAG_GUIDANCE}
 Return JSON:
 {
   "title": string,
   "summary": string,
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
+  "tags": string[] (5-12 lowercase single words)
 }`,
       },
       { role: "user", content: fullText.slice(0, 6000) },
@@ -451,6 +461,7 @@ Rules for title and summary:
 - Title: max 6 plain words (e.g. "Kids by the red car").
 - Summary: 1-2 honest sentences about the moment.
 
+Tags: curated keepsake words only — not every word you hear or see. ${AI_TAG_GUIDANCE}
 ${transcript ? `Soundtrack / speech transcript:\n${transcript.slice(0, 4000)}` : "No clear speech transcript (ambient sound or silent)."}
 
 Return JSON:
@@ -458,7 +469,7 @@ Return JSON:
   "title": string,
   "summary": string,
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
+  "tags": string[] (5-12 lowercase single words)
 }`,
     },
   ];
@@ -510,13 +521,13 @@ Rules for title and caption:
 - Title: max 6 plain words (e.g. "Kids by the red car").
 - Caption: one honest sentence about the scene.
 
-Tags may be warmer when they fit the image.
+Tags: curated keepsake words only — not objects in the frame. ${AI_TAG_GUIDANCE}
 Return JSON:
 {
   "title": string,
   "caption": string,
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
+  "tags": string[] (5-12 lowercase single words)
 }`,
           },
           { type: "image_url", image_url: { url: dataUrl } },
@@ -588,12 +599,20 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
     buffer = Buffer.from(converted);
   }
 
-  const oriented = await sharp(buffer).rotate().jpeg({ quality: 88 }).toBuffer();
-  const meta = await sharp(oriented).metadata();
+  const rotated = await sharp(buffer).rotate().toBuffer();
+  const meta = await sharp(rotated).metadata();
 
-  const thumb = await sharp(oriented)
-    .resize({ width: 1200, withoutEnlargement: true })
-    .jpeg({ quality: 82 })
+  // "full" is the largest we ever serve (lightbox). Phone photos are ~4000px
+  // and multiple MB raw; cap to 2048px so a single view isn't several MB.
+  const oriented = await sharp(rotated)
+    .resize({ width: 2048, height: 2048, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 80, mozjpeg: true })
+    .toBuffer();
+
+  // "thumb" is what the grids and inline players use by default.
+  const thumb = await sharp(rotated)
+    .resize({ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 74, mozjpeg: true })
     .toBuffer();
 
   const jpegBlob = await put(`processed/${item.id}/full.jpg`, oriented, {
@@ -871,7 +890,8 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
   const aiTagWords = tagWordsFromList(tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
-  const spokenNormalized = new Set(kept.map((w) => w.normalized));
+  const cloudSpeech = kept.filter((w) => isCloudWorthyWord(w.normalized));
+  const spokenNormalized = new Set(cloudSpeech.map((w) => w.normalized));
   const extraTags = aiTagWords.filter(
     (w) => !spokenNormalized.has(w.normalized),
   );
@@ -889,9 +909,9 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     })
     .returning();
 
-  if (kept.length > 0) {
+  if (cloudSpeech.length > 0) {
     await db.insert(words).values(
-      kept.map((w) => ({
+      cloudSpeech.map((w) => ({
         transcriptId: transcriptRow.id,
         mediaId: item.id,
         contributorId: item.contributorId,
