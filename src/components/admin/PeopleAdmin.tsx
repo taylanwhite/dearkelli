@@ -8,6 +8,7 @@ export type AdminPerson = {
   name: string;
   relationship: string | null;
   inviteToken: string;
+  isTest: boolean;
   createdAt: string | Date;
   uploadCount: number;
   readyCount: number;
@@ -55,6 +56,7 @@ export function PeopleAdmin({ initialPeople }: Props) {
       setPeople((prev) => [
         {
           ...data,
+          isTest: data.isTest ?? false,
           uploadCount: 0,
           readyCount: 0,
           pendingCount: 0,
@@ -237,7 +239,14 @@ export function PeopleAdmin({ initialPeople }: Props) {
             ) : (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-lg text-[#F6F0E8]">{person.name}</p>
+                  <p className="flex flex-wrap items-center gap-2 text-lg text-[#F6F0E8]">
+                    {person.name}
+                    {person.isTest && (
+                      <span className="rounded-full bg-[#E8B14C]/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#E8B14C]">
+                        test
+                      </span>
+                    )}
+                  </p>
                   {person.relationship && (
                     <p className="text-sm text-[#E4899B]/90">
                       {person.relationship}

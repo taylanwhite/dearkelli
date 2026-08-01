@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { contributors, media } from "@/db/schema";
+import { scheduleMediaProcessing } from "@/lib/enqueue-process";
 import { ALLOWED_CONTENT_TYPES, kindFromMime } from "@/lib/media";
 
 export const runtime = "nodejs";
@@ -75,15 +76,33 @@ export async function POST(request: Request): Promise<NextResponse> {
             .where(eq(media.blobUrl, blob.url))
             .limit(1);
 
-          if (existing.length > 0) return;
+          if (existing.length > 0) {
+            const [row] = await db
+              .select({ id: media.id, status: media.status })
+              .from(media)
+              .where(eq(media.blobUrl, blob.url))
+              .limit(1);
+            if (
+              row &&
+              (row.status === "uploaded" || row.status === "failed")
+            ) {
+              scheduleMediaProcessing(row.id);
+            }
+            return;
+          }
 
-          await db.insert(media).values({
-            contributorId: payload.contributorId,
-            blobUrl: blob.url,
-            kind: payload.kind,
-            status: "uploaded",
-            originalFilename: payload.originalFilename,
-          });
+          const [created] = await db
+            .insert(media)
+            .values({
+              contributorId: payload.contributorId,
+              blobUrl: blob.url,
+              kind: payload.kind,
+              status: "uploaded",
+              originalFilename: payload.originalFilename,
+            })
+            .returning({ id: media.id });
+
+          scheduleMediaProcessing(created.id);
         } catch (error) {
           console.error("onUploadCompleted failed", error);
           throw error;

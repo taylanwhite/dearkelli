@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SearchBox } from "@/components/SearchBox";
+import { playableUrl } from "@/lib/blob";
 import { searchAll } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -113,7 +114,7 @@ export default async function SearchPage({ searchParams }: Props) {
                   <li key={photo.id} className="overflow-hidden rounded-xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={photo.posterUrl || photo.blobUrl}
+                      src={playableUrl(photo.posterUrl || photo.blobUrl)}
                       alt={
                         photo.caption ||
                         photo.title ||

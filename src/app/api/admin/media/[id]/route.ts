@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { media, phrases, transcripts, words } from "@/db/schema";
+import { scheduleMediaProcessing } from "@/lib/enqueue-process";
 
 export const runtime = "nodejs";
 
@@ -49,6 +50,10 @@ export async function PATCH(request: Request, { params }: Params) {
       })
       .where(eq(media.id, id))
       .returning();
+
+    if (body.requeue) {
+      scheduleMediaProcessing(id);
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

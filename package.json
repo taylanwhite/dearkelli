@@ -4,13 +4,16 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "tsx scripts/migrate.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed": "tsx scripts/seed.ts",
+    "seed:test": "tsx scripts/seed-test.ts",
+    "seed:test:clean": "tsx scripts/clean-test.ts",
     "process": "tsx scripts/process-media.ts"
   },
   "dependencies": {
@@ -18,6 +21,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/blob": "^2.6.1",
     "d3-cloud": "^1.2.9",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "fluent-ffmpeg": "^2.1.3",
     "heic-convert": "^2.1.0",
@@ -26,6 +30,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "sharp": "^0.35.3",
+    "tsx": "^4.23.1",
     "uuid": "^14.0.1",
     "wink-lemmatizer": "^3.0.4",
     "zod": "^4.4.3"
@@ -39,12 +44,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
-    "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "15.5.22",
     "tailwindcss": "^4",
-    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

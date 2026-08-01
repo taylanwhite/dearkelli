@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Supercut } from "@/components/Supercut";
+import { playableUrl } from "@/lib/blob";
 import { getPhraseOccurrences, getWordOccurrences } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -24,9 +25,9 @@ export default async function WordPage({ params, searchParams }: Props) {
     .filter((r) => r.kind !== "image")
     .map((r) => ({
       id: "wordId" in r ? r.wordId : r.phraseId,
-      blobUrl: r.blobUrl,
+      blobUrl: playableUrl(r.blobUrl),
       kind: r.kind as "video" | "audio" | "image",
-      posterUrl: r.posterUrl,
+      posterUrl: r.posterUrl ? playableUrl(r.posterUrl) : null,
       startMs: r.startMs,
       endMs: r.endMs,
       contributorName: r.contributorName,

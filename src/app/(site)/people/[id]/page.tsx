@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { playableUrl } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -70,15 +71,21 @@ export default async function PersonPage({ params }: Props) {
               >
                 {clip.kind === "video" ? (
                   <video
-                    src={clip.blobUrl}
-                    poster={clip.posterUrl ?? undefined}
+                    src={playableUrl(clip.blobUrl)}
+                    poster={
+                      clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
+                    }
                     controls
                     playsInline
                     className="aspect-video w-full bg-black object-contain"
                   />
                 ) : (
                   <div className="px-5 py-6">
-                    <audio src={clip.blobUrl} controls className="w-full" />
+                    <audio
+                      src={playableUrl(clip.blobUrl)}
+                      controls
+                      className="w-full"
+                    />
                   </div>
                 )}
                 <div className="px-5 py-4">
@@ -107,7 +114,7 @@ export default async function PersonPage({ params }: Props) {
               <li key={photo.id} className="overflow-hidden rounded-xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={photo.posterUrl || photo.blobUrl}
+                  src={playableUrl(photo.posterUrl || photo.blobUrl)}
                   alt={photo.caption || photo.title || `From ${person.name}`}
                   className="aspect-square w-full object-cover"
                 />

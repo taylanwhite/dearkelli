@@ -88,7 +88,7 @@ export function UploadZone({ token, onAllSettled }: Props) {
 
       try {
         const blob = await upload(tracked.file.name, tracked.file, {
-          access: "public",
+          access: "private",
           handleUploadUrl: "/api/blob/upload",
           multipart: tracked.file.size > 4 * 1024 * 1024,
           clientPayload: JSON.stringify({
@@ -296,7 +296,8 @@ export function UploadZone({ token, onAllSettled }: Props) {
 
       {uploading && (
         <p className="text-center text-sm text-[var(--cream)]/45">
-          Keep this page open until each one finishes.
+          Keep this page open until each one finishes. We&apos;ll listen and
+          find the words after it lands.
         </p>
       )}
     </div>

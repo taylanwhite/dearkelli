@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgEnum,
   pgTable,
@@ -16,15 +17,20 @@ export const mediaStatusEnum = pgEnum("media_status", [
   "failed",
 ]);
 
-export const contributors = pgTable("contributors", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  name: text("name").notNull(),
-  relationship: text("relationship"),
-  inviteToken: text("invite_token").notNull().unique(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const contributors = pgTable(
+  "contributors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: text("name").notNull(),
+    relationship: text("relationship"),
+    inviteToken: text("invite_token").notNull().unique(),
+    isTest: boolean("is_test").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("contributors_is_test_idx").on(table.isTest)],
+);
 
 export const media = pgTable(
   "media",
@@ -45,6 +51,7 @@ export const media = pgTable(
     themes: text("themes").array(),
     caption: text("caption"),
     originalFilename: text("original_filename"),
+    isTest: boolean("is_test").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -52,6 +59,7 @@ export const media = pgTable(
   (table) => [
     index("media_contributor_id_idx").on(table.contributorId),
     index("media_status_idx").on(table.status),
+    index("media_is_test_idx").on(table.isTest),
   ],
 );
 

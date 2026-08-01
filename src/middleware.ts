@@ -10,14 +10,18 @@ const PUBLIC_PREFIXES = [
   "/login",
   "/admin/login",
   "/api/blob",
-  "/api/media",
+  "/api/media", // create-record after upload; /api/media/stream is NOT public
   "/api/auth",
   "/api/contributor",
   "/api/gather",
   "/api/admin/login",
+  "/api/process",
 ];
 
 function isPublic(pathname: string) {
+  // Private blob streaming requires the site/admin cookie.
+  if (pathname.startsWith("/api/media/stream")) return false;
+
   return PUBLIC_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

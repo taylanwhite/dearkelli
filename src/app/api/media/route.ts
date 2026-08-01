@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/db";
 import { contributors, media } from "@/db/schema";
+import { scheduleMediaProcessing } from "@/lib/enqueue-process";
 import { kindFromMime } from "@/lib/media";
 
 export const runtime = "nodejs";
@@ -36,12 +37,15 @@ export async function POST(request: Request) {
     }
 
     const existing = await db
-      .select({ id: media.id })
+      .select({ id: media.id, status: media.status })
       .from(media)
       .where(eq(media.blobUrl, parsed.blobUrl))
       .limit(1);
 
     if (existing[0]) {
+      if (existing[0].status === "uploaded" || existing[0].status === "failed") {
+        scheduleMediaProcessing(existing[0].id);
+      }
       return NextResponse.json({ id: existing[0].id, deduped: true });
     }
 
@@ -63,7 +67,9 @@ export async function POST(request: Request) {
       })
       .returning({ id: media.id });
 
-    return NextResponse.json({ id: row.id, deduped: false });
+    scheduleMediaProcessing(row.id);
+
+    return NextResponse.json({ id: row.id, deduped: false, processing: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });

@@ -246,6 +246,7 @@ export async function searchAll(query: string) {
               ilike(media.caption, pattern),
               ilike(media.title, pattern),
               ilike(media.summary, pattern),
+              sql`array_to_string(${media.themes}, ' ') ilike ${pattern}`,
             ),
           ),
         )

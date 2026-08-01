@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { playableUrl } from "@/lib/blob";
 import { getPeople, getPhotos } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -55,7 +56,7 @@ export default async function PhotosPage({ searchParams }: Props) {
             <li key={photo.id} className="mb-4 break-inside-avoid">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={photo.posterUrl || photo.blobUrl}
+                src={playableUrl(photo.posterUrl || photo.blobUrl)}
                 alt={
                   photo.caption ||
                   photo.title ||

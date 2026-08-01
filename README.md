@@ -23,11 +23,11 @@ You need:
 - `ADMIN_PASSWORD` — admin console at `/admin`
 - `GATHER_TOKEN` — secret path for the mom invite page (`/gather/<token>`)
 
-2. Install and push schema:
+2. Install and migrate:
 
 ```bash
 npm install
-npm run db:push
+npm run db:migrate
 ```
 
 3. Run locally (or deploy to Vercel):
@@ -40,13 +40,47 @@ Mom’s invite board: `https://your-domain/gather/<GATHER_TOKEN>`
 Contributor upload: `/send/<invite-token>` (generated on the gather page)  
 Her site: `/` (password-gated)
 
+## Database migrations
+
+Schema lives in `src/db/schema.ts`. Migrations are SQL files in `drizzle/`.
+
+```bash
+# After changing the schema:
+npm run db:generate          # creates a new drizzle/000x_*.sql
+npm run db:migrate           # apply locally
+
+# Commit the drizzle/ folder, then deploy.
+# Vercel runs migrations automatically before next build.
+```
+
+`npm run build` is `tsx scripts/migrate.ts && next build`. If a migration fails, the deploy fails — which is what you want.
+
+`db:push` still exists for throwaway local experiments. Prefer generate + migrate for anything that ships.
+
+## Test data
+
+```bash
+npm run seed:test         # 5 test people + jpgs/mp4s/audio, all is_test=true
+npm run seed:test:clean   # delete test rows + blob files
+```
+
+Test people appear in the word cloud and admin with a **test** badge. Wipe them before the real birthday.
+
 ## Collection first
 
 Ship `/send/[token]` immediately. Uploads go straight to Vercel Blob from the browser (multipart, progress). The app records each file as `uploaded` — processing is separate so a long iPhone video never blocks the thank-you screen.
 
-## Processing
+## Processing (automatic)
 
-After uploads land, run the pipeline by hand:
+Every upload is analyzed as soon as it lands (`uploaded` → `processing` → `ready`):
+
+1. Extract / normalize audio (ffmpeg when needed; Whisper 25MB limit)  
+2. Transcribe with Whisper word-level timestamps  
+3. Normalize words + detect phrases (“i love you”, …)  
+4. AI metadata: title, summary, themes, word tags  
+5. Photos: HEIC→JPEG, orient, thumbnail, vision caption + tags  
+
+Set `PROCESS_SECRET` (or reuse `ADMIN_PASSWORD`) in Vercel. Manual batch still works:
 
 ```bash
 npm run process           # all status=uploaded
@@ -54,25 +88,10 @@ npm run process -- --failed
 npm run process -- --id=<uuid>
 ```
 
-It will:
-
-1. Extract 16kHz mono MP3 with ffmpeg  
-2. Transcribe with Whisper word timestamps  
-3. Normalize / lemmatize / filter stopwords (with the emotional allowlist)  
-4. Detect phrases like “i love you”  
-5. Generate title, summary, themes  
-6. Convert HEIC → JPEG, thumbnail, caption photos  
 
 ## Deploy
 
-Deploy to Vercel. Set the same env vars. Connect Neon and Blob in the Vercel dashboard. After deploy:
-
-```bash
-npm run db:push
-npm run seed
-```
-
-Share personal `/send/...` links. Keep `/send/open-kelli` as the nameless fallback.
+Deploy to Vercel with the same env vars (`DATABASE_URL` must be available at **build** time so migrations can run). Schema changes ship by committing files under `drizzle/` — no manual `db:push` on prod.
 
 ## Build order (status)
 

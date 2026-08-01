@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { playableUrl } from "@/lib/blob";
 import { getSnippetForWord } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -15,5 +16,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No snippet" }, { status: 404 });
   }
 
-  return NextResponse.json(snippet);
+  return NextResponse.json({
+    ...snippet,
+    blobUrl: playableUrl(snippet.blobUrl),
+  });
 }

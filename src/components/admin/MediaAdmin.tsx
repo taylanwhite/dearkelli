@@ -15,6 +15,7 @@ export type AdminMediaItem = {
   durationSeconds: number | null;
   themes: string[] | null;
   caption: string | null;
+  isTest: boolean;
   createdAt: string | Date;
   contributorId: string;
   contributorName: string;
@@ -125,6 +126,11 @@ export function MediaAdmin({ initialMedia }: Props) {
                     >
                       {item.status}
                     </span>
+                    {item.isTest && (
+                      <span className="rounded-full bg-[#E8B14C]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#E8B14C]">
+                        test
+                      </span>
+                    )}
                   </div>
                   <p className="mt-2 text-[#F6F0E8]">
                     {item.title || item.originalFilename || "Untitled"}
@@ -146,7 +152,7 @@ export function MediaAdmin({ initialMedia }: Props) {
                 </div>
                 <div className="flex flex-wrap gap-2 sm:justify-end">
                   <a
-                    href={item.blobUrl}
+                    href={`/api/media/stream?url=${encodeURIComponent(item.blobUrl)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
