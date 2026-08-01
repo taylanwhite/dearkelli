@@ -20,6 +20,7 @@ You need:
 - `BLOB_READ_WRITE_TOKEN` — Vercel Blob
 - `OPENAI_API_KEY` — Whisper + captions
 - `SITE_PASSWORD` — the shared gate for her site
+- `ADMIN_PASSWORD` — admin console at `/admin`
 - `GATHER_TOKEN` — secret path for the mom invite page (`/gather/<token>`)
 
 2. Install and push schema:

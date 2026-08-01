@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 export const AUTH_COOKIE = "kelli_gate";
+export const ADMIN_COOKIE = "kelli_admin";
 
 export function getSitePassword(): string {
   const password = process.env.SITE_PASSWORD;
@@ -10,10 +11,28 @@ export function getSitePassword(): string {
   return password;
 }
 
+export function getAdminPassword(): string {
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error("ADMIN_PASSWORD is not set");
+  }
+  return password;
+}
+
 export async function isAuthenticated(): Promise<boolean> {
   const jar = await cookies();
   const value = jar.get(AUTH_COOKIE)?.value;
   return value === getSitePassword();
+}
+
+export async function isAdminAuthenticated(): Promise<boolean> {
+  try {
+    const jar = await cookies();
+    const value = jar.get(ADMIN_COOKIE)?.value;
+    return timingSafeEqual(value ?? "", getAdminPassword());
+  } catch {
+    return false;
+  }
 }
 
 export function timingSafeEqual(a: string, b: string): boolean {
