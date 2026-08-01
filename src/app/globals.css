@@ -1,11 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --ground: #151021;
-  --surface: #231a33;
-  --gold: #e8b14c;
-  --blush: #e4899b;
-  --cream: #f6f0e8;
+  /* Retro 70s: white, gold, forest green */
+  --ground: #fffdf8;
+  --surface: #fff6e4;
+  --gold: #c9a227;
+  --gold-deep: #a8841a;
+  --forest: #2c5a45;
+  --forest-deep: #1e3d30;
+  --blush: #2c5a45; /* secondary accent = forest (keeps existing var names working) */
+  --cream: #1e3d30; /* primary ink (kept name so existing text classes work) */
+  --muted: #5a7266;
+  --line: rgba(30, 61, 48, 0.12);
   --background: var(--ground);
   --foreground: var(--cream);
 }
@@ -16,6 +22,9 @@
   --color-ground: var(--ground);
   --color-surface: var(--surface);
   --color-gold: var(--gold);
+  --color-gold-deep: var(--gold-deep);
+  --color-forest: var(--forest);
+  --color-forest-deep: var(--forest-deep);
   --color-blush: var(--blush);
   --color-cream: var(--cream);
   --font-sans: var(--font-body);
@@ -23,19 +32,24 @@
 }
 
 html {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background: var(--ground);
+  background:
+    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(201, 162, 39, 0.22), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(44, 90, 69, 0.1), transparent 50%),
+    radial-gradient(ellipse 50% 35% at 0% 80%, rgba(201, 162, 39, 0.1), transparent 45%),
+    var(--ground);
+  background-attachment: fixed;
   color: var(--cream);
   font-family: var(--font-body), system-ui, sans-serif;
   min-height: 100dvh;
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--gold) 45%, transparent);
-  color: var(--cream);
+  background: color-mix(in oklab, var(--gold) 55%, white);
+  color: var(--forest-deep);
 }
 
 a {

@@ -2,7 +2,7 @@
  * Apply Drizzle migrations.
  *
  * Runs automatically before `next build` on Vercel.
- * Safe to re-run — already-applied migrations are skipped.
+ * Safe to re-run; already-applied migrations are skipped.
  *
  * If the schema was previously applied with `db:push` and there is no
  * migration history yet, this baselines existing migrations so CREATE
@@ -33,7 +33,7 @@ type Journal = {
 function databaseUrl(): string {
   const raw = process.env.DATABASE_URL;
   if (!raw) {
-    throw new Error("DATABASE_URL is not set — cannot run migrations");
+    throw new Error("DATABASE_URL is not set; cannot run migrations");
   }
   // Prefer the direct (non-pooler) endpoint for DDL.
   return raw.replace("-pooler", "");
@@ -84,7 +84,7 @@ async function needsBaseline(sql: Sql): Promise<boolean> {
 async function baseline(sql: Sql) {
   const journal = readJournal();
   console.log(
-    `Schema already exists — baselining ${journal.entries.length} migration(s) without re-applying SQL.`,
+    `Schema already exists; baselining ${journal.entries.length} migration(s) without re-applying SQL.`,
   );
 
   await sql`CREATE SCHEMA IF NOT EXISTS drizzle`;
@@ -112,7 +112,7 @@ async function baseline(sql: Sql) {
 
 async function main() {
   if (!existsSync(join(MIGRATIONS_FOLDER, "meta/_journal.json"))) {
-    console.log("No migrations folder yet — skipping.");
+    console.log("No migrations folder yet; skipping.");
     return;
   }
 

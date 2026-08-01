@@ -24,7 +24,7 @@ export function Supercut({ clips, label }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [keepGoing, setKeepGoing] = useState(true);
 
   const current = clips[index];
 
@@ -55,7 +55,7 @@ export function Supercut({ clips, label }: Props) {
     const onTime = () => {
       if (el.currentTime >= end) {
         el.pause();
-        if (autoAdvance && index < clips.length - 1) {
+        if (keepGoing && index < clips.length - 1) {
           setIndex((i) => i + 1);
         } else {
           setPlaying(false);
@@ -66,12 +66,20 @@ export function Supercut({ clips, label }: Props) {
     el.addEventListener("timeupdate", onTime);
     return () => {
       el.removeEventListener("timeupdate", onTime);
+      el.pause();
     };
-  }, [current, index, clips.length, playing, autoAdvance]);
+  }, [current, index, clips.length, playing, keepGoing]);
+
+  useEffect(() => {
+    return () => {
+      videoRef.current?.pause();
+      audioRef.current?.pause();
+    };
+  }, []);
 
   if (!current) {
     return (
-      <p className="text-center text-[var(--cream)]/60">
+      <p className="px-5 text-center font-[family-name:var(--font-display)] text-xl text-[var(--cream)]/55">
         No one has said this yet.
       </p>
     );
@@ -87,14 +95,14 @@ export function Supercut({ clips, label }: Props) {
             src={current.blobUrl}
             poster={current.posterUrl ?? undefined}
             playsInline
-            className="aspect-video w-full bg-black object-contain"
+            className="aspect-video w-full bg-[var(--forest-deep)] object-contain"
             onPlay={() => setPlaying(true)}
             onPause={() => setPlaying(false)}
           />
         )}
         {current.kind === "audio" && (
-          <div className="flex aspect-video flex-col items-center justify-center gap-6 bg-[radial-gradient(circle_at_center,_rgba(232,177,76,0.18),_transparent_60%)] px-6">
-            <p className="font-[family-name:var(--font-display)] text-3xl text-[var(--gold)]">
+          <div className="flex aspect-video flex-col items-center justify-center gap-6 bg-[radial-gradient(circle_at_center,_rgba(201,162,39,0.28),_transparent_60%),linear-gradient(180deg,_#fff6e4,_#fffdf8)] px-6">
+            <p className="font-[family-name:var(--font-display)] text-3xl text-[var(--gold-deep)]">
               {label}
             </p>
             <audio
@@ -118,28 +126,16 @@ export function Supercut({ clips, label }: Props) {
         )}
       </div>
 
-      <div className="mt-5 flex items-start justify-between gap-4">
-        <div>
-          <p className="font-[family-name:var(--font-display)] text-xl text-[var(--cream)]">
-            {current.contributorName}
-          </p>
-          {current.relationship && (
-            <p className="text-sm text-[var(--blush)]/90">
-              {current.relationship}
-            </p>
-          )}
-          {current.title && (
-            <p className="mt-1 text-sm text-[var(--cream)]/50">
-              {current.title}
-            </p>
-          )}
-        </div>
-        <p className="shrink-0 text-sm text-[var(--cream)]/40">
-          {index + 1} of {clips.length}
+      <div className="mt-6 text-center">
+        <p className="font-[family-name:var(--font-display)] text-2xl text-[var(--forest-deep)]">
+          {current.contributorName}
         </p>
+        {current.relationship && (
+          <p className="mt-1 text-[var(--gold-deep)]">{current.relationship}</p>
+        )}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
         <button
           type="button"
           onClick={() => {
@@ -151,9 +147,9 @@ export function Supercut({ clips, label }: Props) {
               void el.play();
             }
           }}
-          className="rounded-full bg-[var(--gold)] px-5 py-2.5 text-sm font-medium text-[var(--ground)]"
+          className="rounded-full bg-[var(--gold)] px-5 py-2.5 text-sm font-medium text-white"
         >
-          Replay this one
+          Hear that again
         </button>
         <button
           type="button"
@@ -162,9 +158,9 @@ export function Supercut({ clips, label }: Props) {
             setPlaying(true);
             setIndex((i) => Math.max(0, i - 1));
           }}
-          className="rounded-full border border-[var(--cream)]/15 px-5 py-2.5 text-sm text-[var(--cream)]/80 disabled:opacity-30"
+          className="rounded-full border border-[var(--forest)]/15 px-5 py-2.5 text-sm text-[var(--forest)] disabled:opacity-30"
         >
-          Previous
+          Before
         </button>
         <button
           type="button"
@@ -173,44 +169,44 @@ export function Supercut({ clips, label }: Props) {
             setPlaying(true);
             setIndex((i) => Math.min(clips.length - 1, i + 1));
           }}
-          className="rounded-full border border-[var(--cream)]/15 px-5 py-2.5 text-sm text-[var(--cream)]/80 disabled:opacity-30"
+          className="rounded-full border border-[var(--forest)]/15 px-5 py-2.5 text-sm text-[var(--forest)] disabled:opacity-30"
         >
-          Next
+          Next voice
         </button>
-        <label className="ml-auto flex items-center gap-2 text-sm text-[var(--cream)]/50">
-          <input
-            type="checkbox"
-            checked={autoAdvance}
-            onChange={(e) => setAutoAdvance(e.target.checked)}
-            className="accent-[var(--gold)]"
-          />
-          Play through
-        </label>
       </div>
 
-      <ol className="mt-10 space-y-2">
-        {clips.map((clip, i) => (
-          <li key={clip.id}>
-            <button
-              type="button"
-              onClick={() => {
-                setIndex(i);
-                setPlaying(true);
-              }}
-              className={`flex w-full items-center justify-between rounded-xl px-4 py-3 text-left transition ${
-                i === index
-                  ? "bg-[var(--surface)] text-[var(--cream)]"
-                  : "text-[var(--cream)]/55 hover:bg-[var(--surface)]/50 hover:text-[var(--cream)]/80"
-              }`}
-            >
-              <span>{clip.contributorName}</span>
-              <span className="text-xs text-[var(--cream)]/35">
-                {(clip.startMs / 1000).toFixed(1)}s
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <label className="mt-5 flex items-center justify-center gap-2 text-sm text-[var(--cream)]/45">
+        <input
+          type="checkbox"
+          checked={keepGoing}
+          onChange={(e) => setKeepGoing(e.target.checked)}
+          className="accent-[var(--gold)]"
+        />
+        Keep going through everyone
+      </label>
+
+      {clips.length > 1 && (
+        <ul className="mt-12 flex flex-wrap justify-center gap-x-5 gap-y-2">
+          {clips.map((clip, i) => (
+            <li key={clip.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIndex(i);
+                  setPlaying(true);
+                }}
+                className={`font-[family-name:var(--font-display)] text-lg transition ${
+                  i === index
+                    ? "text-[var(--gold-deep)] underline decoration-[var(--gold)] underline-offset-4"
+                    : "text-[var(--forest)]/50 hover:text-[var(--forest)]"
+                }`}
+              >
+                {clip.contributorName}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

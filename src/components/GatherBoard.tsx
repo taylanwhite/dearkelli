@@ -151,7 +151,7 @@ export function GatherBoard({ token, initialPeople }: Props) {
 
         {sorted.length === 0 ? (
           <p className="text-[var(--cream)]/50">
-            Start with someone close — Mom, a sister, an old friend.
+            Start with someone close. Mom, a sister, an old friend.
           </p>
         ) : (
           <ul className="space-y-3">

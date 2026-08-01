@@ -26,7 +26,7 @@ export default async function SendPage({ params }: Props) {
 
   return (
     <main className="min-h-dvh bg-[var(--ground)]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(232,177,76,0.12),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(228,137,155,0.1),_transparent_50%)]" />
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.22),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(44,90,69,0.1),_transparent_50%)]" />
       <div className="relative">
         <SendForm
           contributor={{
@@ -34,6 +34,7 @@ export default async function SendPage({ params }: Props) {
             name: contributor.name,
             relationship: contributor.relationship,
             inviteToken: contributor.inviteToken,
+            avatarUrl: contributor.avatarUrl,
           }}
           isGeneric={isGeneric}
         />

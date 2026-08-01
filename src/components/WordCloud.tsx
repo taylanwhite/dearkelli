@@ -3,6 +3,10 @@
 import cloud from "d3-cloud";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  trackOrphanAudio,
+  untrackOrphanAudio,
+} from "@/lib/media-playback";
 
 export type CloudWord = {
   text: string;
@@ -139,6 +143,17 @@ export function WordCloud({ words }: Props) {
     };
   }, [words, size.width, size.height, counts.min, counts.max]);
 
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        untrackOrphanAudio(audioRef.current);
+        audioRef.current.src = "";
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   async function playSnippet(word: string) {
     try {
       const res = await fetch(`/api/snippet?word=${encodeURIComponent(word)}`);
@@ -151,11 +166,14 @@ export function WordCloud({ words }: Props) {
 
       if (audioRef.current) {
         audioRef.current.pause();
+        untrackOrphanAudio(audioRef.current);
+        audioRef.current.src = "";
         audioRef.current = null;
       }
 
       const audio = new Audio(data.blobUrl);
       audioRef.current = audio;
+      trackOrphanAudio(audio);
       const start = Math.max(0, data.startMs / 1000 - 0.05);
       const end = data.endMs / 1000 + 0.15;
 
@@ -165,12 +183,13 @@ export function WordCloud({ words }: Props) {
       const stop = () => {
         if (audio.currentTime >= end) {
           audio.pause();
+          untrackOrphanAudio(audio);
           audio.removeEventListener("timeupdate", stop);
         }
       };
       audio.addEventListener("timeupdate", stop);
     } catch {
-      // Snippet playback is optional atmosphere — ignore failures.
+      // Snippet playback is optional atmosphere; ignore failures.
     }
   }
 
@@ -178,7 +197,7 @@ export function WordCloud({ words }: Props) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6 text-center">
         <p className="max-w-sm font-[family-name:var(--font-display)] text-2xl text-[var(--cream)]/70">
-          The room is still gathering voices.
+          Your people are still finding their words.
         </p>
       </div>
     );
@@ -192,7 +211,7 @@ export function WordCloud({ words }: Props) {
         viewBox={`0 0 ${size.width} ${size.height}`}
         className="mx-auto block"
         role="img"
-        aria-label="Words people have said about Kelli"
+        aria-label="Words people have said about you"
       >
         <g transform={`translate(${size.width / 2}, ${size.height / 2})`}>
           {laidOut.map((word, index) => {
@@ -227,10 +246,12 @@ export function WordCloud({ words }: Props) {
                     dominantBaseline="middle"
                     fill={
                       hovered === word.text
-                        ? "var(--gold)"
-                        : index % 5 === 0
-                          ? "var(--blush)"
-                          : "var(--cream)"
+                        ? "var(--gold-deep)"
+                        : index % 4 === 0
+                          ? "var(--gold)"
+                          : index % 3 === 0
+                            ? "var(--forest)"
+                            : "var(--forest-deep)"
                     }
                     fontFamily="var(--font-display), Georgia, serif"
                     fontSize={word.size}

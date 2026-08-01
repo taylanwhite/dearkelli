@@ -24,6 +24,7 @@ export const contributors = pgTable(
     name: text("name").notNull(),
     relationship: text("relationship"),
     inviteToken: text("invite_token").notNull().unique(),
+    avatarUrl: text("avatar_url"),
     isTest: boolean("is_test").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()

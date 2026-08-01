@@ -1,0 +1,139 @@
+"use client";
+
+import { upload } from "@vercel/blob/client";
+import { useRef, useState } from "react";
+import { playableUrl } from "@/lib/blob";
+
+type Props = {
+  token: string;
+  initialUrl?: string | null;
+  onUploaded?: (url: string) => void;
+};
+
+export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [remoteUrl, setRemoteUrl] = useState<string | null>(initialUrl ?? null);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "uploading" | "done" | "error">(
+    initialUrl ? "done" : "idle",
+  );
+  const [error, setError] = useState<string | null>(null);
+
+  const previewSrc = localPreview
+    ? localPreview
+    : remoteUrl
+      ? playableUrl(remoteUrl)
+      : null;
+
+  async function handleFile(file: File) {
+    setError(null);
+    setStatus("uploading");
+    const local = URL.createObjectURL(file);
+    setLocalPreview(local);
+
+    try {
+      const blob = await upload(file.name, file, {
+        access: "private",
+        handleUploadUrl: "/api/blob/upload",
+        clientPayload: JSON.stringify({
+          token,
+          contentType: file.type || "image/jpeg",
+          filename: file.name,
+          purpose: "avatar",
+        }),
+      });
+
+      const res = await fetch("/api/media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          blobUrl: blob.url,
+          contentType: file.type || "image/jpeg",
+          filename: file.name,
+          asAvatar: true,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error || "Couldn't save your photo");
+      }
+
+      setRemoteUrl(blob.url);
+      setLocalPreview(null);
+      URL.revokeObjectURL(local);
+      setStatus("done");
+      onUploaded?.(blob.url);
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Couldn't upload that");
+    }
+  }
+
+  return (
+    <div className="rounded-2xl bg-[var(--surface)] px-5 py-6 text-center">
+      <p className="font-[family-name:var(--font-display)] text-xl text-[var(--cream)]">
+        A photo of you
+      </p>
+      <p className="mt-2 text-sm leading-relaxed text-[var(--cream)]/60">
+        Just your face, or you with her. She&apos;ll see it when she finds your
+        name among the words.
+      </p>
+
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={status === "uploading"}
+        className="mx-auto mt-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[var(--forest)] text-[var(--ground)] ring-2 ring-[var(--gold)]/40 transition hover:ring-[var(--gold)] disabled:opacity-70"
+      >
+        {previewSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={previewSrc}
+            alt="Your photo"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="px-3 text-sm leading-snug text-[var(--ground)]/90">
+            {status === "uploading" ? "Sending…" : "Add photo"}
+          </span>
+        )}
+      </button>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,.heic,.heif"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+          e.target.value = "";
+        }}
+      />
+
+      {status === "done" && (
+        <p className="mt-3 text-sm text-[var(--gold)]">Got it. Thank you.</p>
+      )}
+      {error && <p className="mt-3 text-sm text-[var(--blush)]">{error}</p>}
+      {status !== "done" && (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="mt-4 text-sm text-[var(--cream)]/45 underline-offset-2 hover:underline"
+        >
+          Choose from your phone
+        </button>
+      )}
+      {status === "done" && (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="mt-3 block w-full text-sm text-[var(--cream)]/40 underline-offset-2 hover:underline"
+        >
+          Use a different photo
+        </button>
+      )}
+    </div>
+  );
+}

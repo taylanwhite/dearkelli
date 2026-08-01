@@ -17,6 +17,7 @@ export async function GET(_request: Request, { params }: Params) {
       name: contributors.name,
       relationship: contributors.relationship,
       inviteToken: contributors.inviteToken,
+      avatarUrl: contributors.avatarUrl,
     })
     .from(contributors)
     .where(eq(contributors.inviteToken, token))
@@ -35,6 +36,7 @@ export async function GET(_request: Request, { params }: Params) {
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   relationship: z.string().trim().max(80).nullable().optional(),
+  avatarUrl: z.string().url().nullable().optional(),
 });
 
 export async function PATCH(request: Request, { params }: Params) {
@@ -66,6 +68,10 @@ export async function PATCH(request: Request, { params }: Params) {
           body.relationship === undefined
             ? existing.relationship
             : body.relationship,
+        avatarUrl:
+          body.avatarUrl === undefined
+            ? existing.avatarUrl
+            : body.avatarUrl,
       })
       .where(eq(contributors.id, existing.id))
       .returning({
@@ -73,6 +79,7 @@ export async function PATCH(request: Request, { params }: Params) {
         name: contributors.name,
         relationship: contributors.relationship,
         inviteToken: contributors.inviteToken,
+        avatarUrl: contributors.avatarUrl,
       });
 
     return NextResponse.json(updated);

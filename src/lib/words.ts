@@ -1,6 +1,6 @@
 import lemmatizer from "wink-lemmatizer";
 
-/** Stopwords we drop — keep the emotional ones via ALLOWLIST. */
+/** Stopwords we drop; keep the emotional ones via ALLOWLIST. */
 const STOPWORDS = new Set([
   "the",
   "a",

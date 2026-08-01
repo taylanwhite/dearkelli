@@ -14,12 +14,12 @@ const interTight = Inter_Tight({
 
 export const metadata: Metadata = {
   title: "For Kelli",
-  description: "Everyone who loves you is already talking.",
+  description: "Everyone who loves you is already here.",
   robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#151021",
+  themeColor: "#fffdf8",
   width: "device-width",
   initialScale: 1,
 };

@@ -17,105 +17,105 @@ export default async function PersonPage({ params }: Props) {
   const photos = clips.filter((c) => c.kind === "image");
   const spoken = clips.filter((c) => c.kind !== "image");
 
+  // A handful of words, no frequencies, just the flavor of their voice
+  const softWords = topWords.slice(0, 8);
+
   return (
-    <main className="mx-auto max-w-3xl px-5 py-10">
+    <main className="mx-auto max-w-2xl px-5 py-10">
       <Link
         href="/people"
-        className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--cream)]/75"
+        className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--forest)]"
       >
         ← Everyone
       </Link>
 
-      <header className="mt-6">
-        <h1 className="font-[family-name:var(--font-display)] text-4xl text-[var(--cream)]">
-          {person.name}
-        </h1>
-        {person.relationship && (
-          <p className="mt-2 text-[var(--blush)]">{person.relationship}</p>
-        )}
+      <header className="mt-8 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+        <span className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--forest)] font-[family-name:var(--font-display)] text-3xl text-[var(--ground)] ring-2 ring-[var(--gold)]/30">
+          {person.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={playableUrl(person.avatarUrl)}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            person.name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map((p) => p[0]?.toUpperCase() ?? "")
+              .join("")
+          )}
+        </span>
+        <div>
+          <h1 className="font-[family-name:var(--font-display)] text-4xl text-[var(--forest-deep)] sm:text-5xl">
+            {person.name}
+          </h1>
+          {person.relationship && (
+            <p className="mt-2 font-[family-name:var(--font-display)] text-lg text-[var(--gold-deep)]">
+              {person.relationship}
+            </p>
+          )}
+        </div>
       </header>
-
-      {topWords.length > 0 && (
-        <section className="mt-10">
-          <h2 className="text-sm uppercase tracking-[0.18em] text-[var(--cream)]/40">
-            Words they used most
-          </h2>
-          <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
-            {topWords.map((w) => (
-              <li key={w.normalized}>
-                <Link
-                  href={`/words/${encodeURIComponent(w.normalized)}`}
-                  className="font-[family-name:var(--font-display)] text-lg text-[var(--gold)]/90 transition hover:text-[var(--gold)]"
-                >
-                  {w.normalized}
-                  <span className="ml-1 text-sm text-[var(--cream)]/35">
-                    {w.totalCount}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {softWords.length > 0 && (
+        <p className="mt-6 max-w-md font-[family-name:var(--font-display)] text-xl leading-relaxed text-[var(--forest)]/80">
+          {softWords.map((w, i) => (
+            <span key={w.normalized}>
+              {i > 0 && <span className="text-[var(--gold)]/50"> · </span>}
+              <Link
+                href={`/words/${encodeURIComponent(w.normalized)}`}
+                className="underline decoration-[var(--gold)]/35 underline-offset-4 transition hover:text-[var(--gold-deep)] hover:decoration-[var(--gold)]"
+              >
+                {w.normalized}
+              </Link>
+            </span>
+          ))}
+        </p>
       )}
 
       {spoken.length > 0 && (
-        <section className="mt-12">
-          <h2 className="text-sm uppercase tracking-[0.18em] text-[var(--cream)]/40">
-            What they said
-          </h2>
-          <ul className="mt-5 space-y-4">
-            {spoken.map((clip) => (
-              <li
-                key={clip.id}
-                className="overflow-hidden rounded-2xl bg-[var(--surface)]"
-              >
-                {clip.kind === "video" ? (
-                  <video
+        <section className="mt-14 space-y-10">
+          {spoken.map((clip) => (
+            <article key={clip.id}>
+              {clip.kind === "video" ? (
+                <video
+                  src={playableUrl(clip.blobUrl)}
+                  poster={
+                    clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
+                  }
+                  controls
+                  playsInline
+                  className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
+                />
+              ) : (
+                <div className="rounded-2xl bg-[var(--surface)] px-5 py-8">
+                  <audio
                     src={playableUrl(clip.blobUrl)}
-                    poster={
-                      clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
-                    }
                     controls
-                    playsInline
-                    className="aspect-video w-full bg-black object-contain"
+                    className="w-full"
                   />
-                ) : (
-                  <div className="px-5 py-6">
-                    <audio
-                      src={playableUrl(clip.blobUrl)}
-                      controls
-                      className="w-full"
-                    />
-                  </div>
-                )}
-                <div className="px-5 py-4">
-                  <p className="font-[family-name:var(--font-display)] text-lg text-[var(--cream)]">
-                    {clip.title || "Untitled"}
-                  </p>
-                  {clip.summary && (
-                    <p className="mt-1 text-sm leading-relaxed text-[var(--cream)]/55">
-                      {clip.summary}
-                    </p>
-                  )}
                 </div>
-              </li>
-            ))}
-          </ul>
+              )}
+              {(clip.title || clip.summary) && (
+                <p className="mt-4 font-[family-name:var(--font-display)] text-lg leading-snug text-[var(--forest-deep)]">
+                  {clip.summary || clip.title}
+                </p>
+              )}
+            </article>
+          ))}
         </section>
       )}
 
       {photos.length > 0 && (
-        <section className="mt-12">
-          <h2 className="text-sm uppercase tracking-[0.18em] text-[var(--cream)]/40">
-            Photos
-          </h2>
-          <ul className="mt-5 grid grid-cols-2 gap-3">
+        <section className="mt-16">
+          <ul className="grid grid-cols-2 gap-3">
             {photos.map((photo) => (
-              <li key={photo.id} className="overflow-hidden rounded-xl">
+              <li key={photo.id} className="overflow-hidden rounded-2xl">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={playableUrl(photo.posterUrl || photo.blobUrl)}
-                  alt={photo.caption || photo.title || `From ${person.name}`}
+                  alt={photo.caption || `From ${person.name}`}
                   className="aspect-square w-full object-cover"
                 />
               </li>

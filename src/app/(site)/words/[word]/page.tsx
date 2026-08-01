@@ -37,23 +37,16 @@ export default async function WordPage({ params, searchParams }: Props) {
 
   return (
     <main className="pt-8">
-      <div className="mx-auto mb-8 max-w-2xl px-5">
+      <div className="mx-auto mb-10 max-w-2xl px-5 text-center">
         <Link
           href="/"
-          className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--cream)]/75"
+          className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--forest)]"
         >
-          ← Back to the room
+          ← All the words
         </Link>
-        <h1 className="mt-4 font-[family-name:var(--font-display)] text-4xl text-[var(--gold)] sm:text-5xl">
+        <h1 className="mt-6 font-[family-name:var(--font-display)] text-5xl text-[var(--gold-deep)] sm:text-6xl">
           {word}
         </h1>
-        <p className="mt-2 text-[var(--cream)]/55">
-          {clips.length === 0
-            ? "Still waiting for this one."
-            : clips.length === 1
-              ? "One person said this."
-              : `${clips.length} people said this.`}
-        </p>
       </div>
       <Supercut clips={clips} label={word} />
     </main>

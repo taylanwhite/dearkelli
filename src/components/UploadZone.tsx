@@ -268,11 +268,11 @@ export function UploadZone({ token, onAllSettled }: Props) {
                         : "Waiting"}
                 </span>
               </div>
-              <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--ground)]">
+              <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--forest)]/10">
                 <div
                   className={`h-full transition-all duration-300 ${
                     f.status === "error"
-                      ? "bg-[var(--blush)]"
+                      ? "bg-[var(--forest)]"
                       : "bg-[var(--gold)]"
                   }`}
                   style={{

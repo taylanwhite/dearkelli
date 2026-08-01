@@ -141,7 +141,7 @@ Return JSON:
   "title": string (max 6 words, warm),
   "summary": string (1-2 sentences),
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 single evocative words for a word cloud — nouns/adjectives/verbs she would feel, lowercase, no stopwords)
+  "tags": string[] (5-12 single evocative words for a word cloud; nouns/adjectives/verbs she would feel, lowercase, no stopwords)
 }`,
       },
       { role: "user", content: fullText.slice(0, 6000) },
@@ -201,7 +201,7 @@ Return JSON:
   "title": string (max 6 words),
   "caption": string (one warm sentence),
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words describing people, places, feelings, objects — for a word cloud)
+  "tags": string[] (5-12 lowercase single words describing people, places, feelings, objects, for a word cloud)
 }`,
           },
           { type: "image_url", image_url: { url: dataUrl } },
@@ -413,7 +413,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       }
     }
 
-    // Whisper 25MB limit — downsample when needed
+    // Whisper 25MB limit; downsample when needed
     if (sourceSize > 20 * 1024 * 1024 || item.kind === "video") {
       try {
         await extractAudio(ffmpeg, sourcePath, audioPath);
@@ -464,7 +464,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         tags: [] as string[],
       };
 
-  // Merge AI tags into word cloud (no supercut moments — timestamps already from speech)
+  // Merge AI tags into word cloud (no supercut moments; timestamps already from speech)
   const aiTagWords = tagWordsFromList(enrichment.tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );

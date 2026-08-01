@@ -171,29 +171,29 @@ export function PeopleAdmin({ initialPeople }: Props) {
     <div className="space-y-8">
       <form
         onSubmit={addPerson}
-        className="space-y-3 rounded-2xl border border-white/10 bg-[#231A33] p-5"
+        className="space-y-3 rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] p-5"
       >
-        <p className="text-sm text-[#F6F0E8]/50">Add someone</p>
+        <p className="text-sm text-[var(--cream)]/50">Add someone</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
             required
-            className="rounded-xl border border-white/10 bg-[#151021] px-4 py-3 text-[#F6F0E8] outline-none focus:ring-2 focus:ring-[#E8B14C]/40"
+            className="rounded-xl border border-[var(--forest)]/10 bg-white px-4 py-3 text-[var(--cream)] outline-none focus:ring-2 focus:ring-[var(--gold)]/40"
           />
           <input
             value={relationship}
             onChange={(e) => setRelationship(e.target.value)}
             placeholder="Relationship (optional)"
-            className="rounded-xl border border-white/10 bg-[#151021] px-4 py-3 text-[#F6F0E8] outline-none focus:ring-2 focus:ring-[#E8B14C]/40"
+            className="rounded-xl border border-[var(--forest)]/10 bg-white px-4 py-3 text-[var(--cream)] outline-none focus:ring-2 focus:ring-[var(--gold)]/40"
           />
         </div>
-        {error && <p className="text-sm text-[#E4899B]">{error}</p>}
+        {error && <p className="text-sm text-[var(--forest)]">{error}</p>}
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-[#E8B14C] px-5 py-2.5 text-sm font-medium text-[#151021] disabled:opacity-60"
+          className="rounded-full bg-[var(--gold)] px-5 py-2.5 text-sm font-medium text-[var(--ground)] disabled:opacity-60"
         >
           {saving ? "Adding…" : "Add & copy link"}
         </button>
@@ -203,34 +203,34 @@ export function PeopleAdmin({ initialPeople }: Props) {
         {people.map((person) => (
           <li
             key={person.id}
-            className="rounded-2xl border border-white/10 bg-[#231A33] px-4 py-4"
+            className="rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] px-4 py-4"
           >
             {editingId === person.id ? (
               <div className="space-y-3">
                 <input
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[#151021] px-4 py-2 text-[#F6F0E8]"
+                  className="w-full rounded-xl border border-[var(--forest)]/10 bg-white px-4 py-2 text-[var(--cream)]"
                 />
                 <input
                   value={editRelationship}
                   onChange={(e) => setEditRelationship(e.target.value)}
                   placeholder="Relationship"
-                  className="w-full rounded-xl border border-white/10 bg-[#151021] px-4 py-2 text-[#F6F0E8]"
+                  className="w-full rounded-xl border border-[var(--forest)]/10 bg-white px-4 py-2 text-[var(--cream)]"
                 />
                 <div className="flex gap-2">
                   <button
                     type="button"
                     disabled={busyId === person.id}
                     onClick={() => saveEdit(person.id)}
-                    className="rounded-full bg-[#E8B14C] px-4 py-2 text-sm text-[#151021]"
+                    className="rounded-full bg-[var(--gold)] px-4 py-2 text-sm text-[var(--ground)]"
                   >
                     Save
                   </button>
                   <button
                     type="button"
                     onClick={() => setEditingId(null)}
-                    className="rounded-full border border-white/15 px-4 py-2 text-sm text-[#F6F0E8]/70"
+                    className="rounded-full border border-[var(--forest)]/15 px-4 py-2 text-sm text-[var(--cream)]/70"
                   >
                     Cancel
                   </button>
@@ -239,23 +239,23 @@ export function PeopleAdmin({ initialPeople }: Props) {
             ) : (
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="flex flex-wrap items-center gap-2 text-lg text-[#F6F0E8]">
+                  <p className="flex flex-wrap items-center gap-2 text-lg text-[var(--cream)]">
                     {person.name}
                     {person.isTest && (
-                      <span className="rounded-full bg-[#E8B14C]/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[#E8B14C]">
+                      <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--gold)]">
                         test
                       </span>
                     )}
                   </p>
                   {person.relationship && (
-                    <p className="text-sm text-[#E4899B]/90">
+                    <p className="text-sm text-[var(--forest)]/90">
                       {person.relationship}
                     </p>
                   )}
-                  <p className="mt-1 truncate text-xs text-[#F6F0E8]/35">
+                  <p className="mt-1 truncate text-xs text-[var(--cream)]/35">
                     {sendPath(person.inviteToken)}
                   </p>
-                  <p className="mt-2 text-xs text-[#F6F0E8]/40">
+                  <p className="mt-2 text-xs text-[var(--cream)]/40">
                     {person.uploadCount} upload
                     {person.uploadCount === 1 ? "" : "s"}
                     {person.pendingCount > 0
@@ -273,7 +273,7 @@ export function PeopleAdmin({ initialPeople }: Props) {
                   <button
                     type="button"
                     onClick={() => copyLink(person.inviteToken, person.id)}
-                    className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
+                    className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
                   >
                     {copiedId === person.id ? "Copied" : "Copy link"}
                   </button>
@@ -284,7 +284,7 @@ export function PeopleAdmin({ initialPeople }: Props) {
                       setEditName(person.name);
                       setEditRelationship(person.relationship ?? "");
                     }}
-                    className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
+                    className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
                   >
                     Edit
                   </button>
@@ -292,7 +292,7 @@ export function PeopleAdmin({ initialPeople }: Props) {
                     type="button"
                     disabled={busyId === person.id}
                     onClick={() => regenerate(person.id)}
-                    className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
+                    className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
                   >
                     New link
                   </button>
@@ -300,7 +300,7 @@ export function PeopleAdmin({ initialPeople }: Props) {
                     type="button"
                     disabled={busyId === person.id}
                     onClick={() => remove(person.id, person.name)}
-                    className="rounded-full border border-[#E4899B]/40 px-3 py-1.5 text-xs text-[#E4899B]"
+                    className="rounded-full border border-[var(--forest)]/40 px-3 py-1.5 text-xs text-[var(--forest)]"
                   >
                     Delete
                   </button>

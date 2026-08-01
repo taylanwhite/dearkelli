@@ -88,8 +88,8 @@ export function MediaAdmin({ initialMedia }: Props) {
             onClick={() => setFilter(f)}
             className={`rounded-full px-3 py-1.5 text-xs capitalize ${
               filter === f
-                ? "bg-[#E8B14C] text-[#151021]"
-                : "border border-white/15 text-[#F6F0E8]/60"
+                ? "bg-[var(--gold)] text-[var(--ground)]"
+                : "border border-[var(--forest)]/15 text-[var(--cream)]/60"
             }`}
           >
             {f}
@@ -101,52 +101,52 @@ export function MediaAdmin({ initialMedia }: Props) {
       </div>
 
       {visible.length === 0 ? (
-        <p className="text-[#F6F0E8]/45">Nothing in this view.</p>
+        <p className="text-[var(--cream)]/45">Nothing in this view.</p>
       ) : (
         <ul className="space-y-3">
           {visible.map((item) => (
             <li
               key={item.id}
-              className="rounded-2xl border border-white/10 bg-[#231A33] px-4 py-4"
+              className="rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] px-4 py-4"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#F6F0E8]/50">
+                    <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
                       {item.kind}
                     </span>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
                         item.status === "ready"
-                          ? "bg-[#E8B14C]/20 text-[#E8B14C]"
+                          ? "bg-[var(--gold)]/20 text-[var(--gold)]"
                           : item.status === "failed"
-                            ? "bg-[#E4899B]/20 text-[#E4899B]"
-                            : "bg-white/10 text-[#F6F0E8]/60"
+                            ? "bg-[var(--forest)]/20 text-[var(--forest)]"
+                            : "bg-[var(--forest)]/10 text-[var(--cream)]/60"
                       }`}
                     >
                       {item.status}
                     </span>
                     {item.isTest && (
-                      <span className="rounded-full bg-[#E8B14C]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[#E8B14C]">
+                      <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--gold)]">
                         test
                       </span>
                     )}
                   </div>
-                  <p className="mt-2 text-[#F6F0E8]">
+                  <p className="mt-2 text-[var(--cream)]">
                     {item.title || item.originalFilename || "Untitled"}
                   </p>
-                  <p className="text-sm text-[#F6F0E8]/45">
+                  <p className="text-sm text-[var(--cream)]/45">
                     {item.contributorName}
                     {item.durationSeconds
                       ? ` · ${item.durationSeconds}s`
                       : ""}
                   </p>
                   {(item.summary || item.caption) && (
-                    <p className="mt-2 line-clamp-2 text-sm text-[#F6F0E8]/40">
+                    <p className="mt-2 line-clamp-2 text-sm text-[var(--cream)]/40">
                       {item.summary || item.caption}
                     </p>
                   )}
-                  <p className="mt-2 font-mono text-[11px] text-[#F6F0E8]/25">
+                  <p className="mt-2 font-mono text-[11px] text-[var(--cream)]/25">
                     {item.id}
                   </p>
                 </div>
@@ -155,7 +155,7 @@ export function MediaAdmin({ initialMedia }: Props) {
                     href={`/api/media/stream?url=${encodeURIComponent(item.blobUrl)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
+                    className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
                   >
                     Open file
                   </a>
@@ -164,7 +164,7 @@ export function MediaAdmin({ initialMedia }: Props) {
                       type="button"
                       disabled={busyId === item.id}
                       onClick={() => requeue(item.id)}
-                      className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-[#F6F0E8]/75"
+                      className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
                     >
                       Requeue process
                     </button>
@@ -173,7 +173,7 @@ export function MediaAdmin({ initialMedia }: Props) {
                     type="button"
                     disabled={busyId === item.id}
                     onClick={() => remove(item.id)}
-                    className="rounded-full border border-[#E4899B]/40 px-3 py-1.5 text-xs text-[#E4899B]"
+                    className="rounded-full border border-[var(--forest)]/40 px-3 py-1.5 text-xs text-[var(--forest)]"
                   >
                     Delete
                   </button>

@@ -7,18 +7,18 @@ const LINKS = [
   { href: "/", label: "Words" },
   { href: "/people", label: "People" },
   { href: "/photos", label: "Photos" },
-  { href: "/search", label: "Search" },
+  { href: "/search", label: "Find" },
 ];
 
 export function SiteNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--cream)]/8 bg-[var(--ground)]/85 backdrop-blur-md">
+    <nav className="sticky top-0 z-40 border-b border-[var(--forest)]/10 bg-[var(--ground)]/90 backdrop-blur-md">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
         <Link
           href="/"
-          className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--gold)]"
+          className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--gold-deep)]"
         >
           Kelli
         </Link>
@@ -34,8 +34,8 @@ export function SiteNav() {
                   href={link.href}
                   className={`rounded-full px-3 py-1.5 text-sm transition ${
                     active
-                      ? "text-[var(--cream)]"
-                      : "text-[var(--cream)]/45 hover:text-[var(--cream)]/80"
+                      ? "bg-[var(--forest)] text-[var(--ground)]"
+                      : "text-[var(--cream)]/55 hover:text-[var(--forest)]"
                   }`}
                 >
                   {link.label}

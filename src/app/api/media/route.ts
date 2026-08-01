@@ -16,6 +16,7 @@ const createSchema = z.object({
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   durationSeconds: z.number().positive().optional(),
+  asAvatar: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -42,14 +43,23 @@ export async function POST(request: Request) {
       .where(eq(media.blobUrl, parsed.blobUrl))
       .limit(1);
 
+    const kind = kindFromMime(parsed.contentType, parsed.filename);
+    const shouldSetAvatar =
+      Boolean(parsed.asAvatar) ||
+      (kind === "image" && !contributor.avatarUrl);
+
     if (existing[0]) {
       if (existing[0].status === "uploaded" || existing[0].status === "failed") {
         scheduleMediaProcessing(existing[0].id);
       }
+      if (shouldSetAvatar && kind === "image") {
+        await db
+          .update(contributors)
+          .set({ avatarUrl: parsed.blobUrl })
+          .where(eq(contributors.id, contributor.id));
+      }
       return NextResponse.json({ id: existing[0].id, deduped: true });
     }
-
-    const kind = kindFromMime(parsed.contentType, parsed.filename);
 
     const [row] = await db
       .insert(media)
@@ -66,6 +76,13 @@ export async function POST(request: Request) {
           : null,
       })
       .returning({ id: media.id });
+
+    if (shouldSetAvatar && kind === "image") {
+      await db
+        .update(contributors)
+        .set({ avatarUrl: parsed.blobUrl })
+        .where(eq(contributors.id, contributor.id));
+    }
 
     scheduleMediaProcessing(row.id);
 

@@ -45,13 +45,15 @@ export function AdminLoginForm() {
         onChange={(e) => setPassword(e.target.value)}
         autoFocus
         placeholder="Admin password"
-        className="w-full rounded-xl border border-white/10 bg-[#231A33] px-4 py-3 text-center text-[#F6F0E8] outline-none ring-[#E8B14C]/40 placeholder:text-[#F6F0E8]/30 focus:ring-2"
+        className="w-full rounded-xl border border-[var(--forest)]/15 bg-white px-4 py-3 text-center text-[var(--cream)] outline-none ring-[var(--gold)]/40 placeholder:text-[var(--cream)]/30 focus:ring-2"
       />
-      {error && <p className="text-center text-sm text-[#E4899B]">{error}</p>}
+      {error && (
+        <p className="text-center text-sm text-[var(--forest)]">{error}</p>
+      )}
       <button
         type="submit"
         disabled={loading || !password}
-        className="w-full rounded-full bg-[#E8B14C] px-6 py-3 text-sm font-medium text-[#151021] disabled:opacity-50"
+        className="w-full rounded-full bg-[var(--gold)] px-6 py-3 text-sm font-medium text-[var(--ground)] disabled:opacity-50"
       >
         {loading ? "Checking…" : "Enter admin"}
       </button>

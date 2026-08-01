@@ -14,10 +14,13 @@ export function AdminNav() {
   const router = useRouter();
 
   return (
-    <header className="border-b border-white/10 bg-[#0f0c16]/90 backdrop-blur">
+    <header className="border-b border-[var(--forest)]/10 bg-[var(--ground)]/90 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
         <div className="flex items-center gap-6">
-          <Link href="/admin" className="text-sm font-semibold text-[#E8B14C]">
+          <Link
+            href="/admin"
+            className="text-sm font-semibold text-[var(--gold-deep)]"
+          >
             Admin
           </Link>
           <nav className="flex gap-1">
@@ -31,7 +34,9 @@ export function AdminNav() {
                   key={link.href}
                   href={link.href}
                   className={`rounded-full px-3 py-1.5 text-sm ${
-                    active ? "text-[#F6F0E8]" : "text-[#F6F0E8]/45 hover:text-[#F6F0E8]/80"
+                    active
+                      ? "bg-[var(--forest)] text-[var(--ground)]"
+                      : "text-[var(--cream)]/50 hover:text-[var(--forest)]"
                   }`}
                 >
                   {link.label}
@@ -47,7 +52,7 @@ export function AdminNav() {
             router.replace("/admin/login");
             router.refresh();
           }}
-          className="text-sm text-[#F6F0E8]/40 hover:text-[#F6F0E8]/70"
+          className="text-sm text-[var(--cream)]/40 hover:text-[var(--cream)]/70"
         >
           Sign out
         </button>

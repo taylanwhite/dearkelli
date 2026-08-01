@@ -1,6 +1,6 @@
 # Words About Kelli
 
-A private birthday site. Family and friends send videos, voice memos, and photos. Everything is transcribed. The home page is a word cloud of every word said about her — click a word, hear everyone say it.
+A private birthday site. Family and friends send videos, voice memos, and photos. Everything is transcribed. The home page is a word cloud of every word said about her. Click a word, hear everyone say it.
 
 ## Stack
 
@@ -16,12 +16,12 @@ cp .env.example .env.local
 
 You need:
 
-- `DATABASE_URL` — Neon connection string
-- `BLOB_READ_WRITE_TOKEN` — Vercel Blob
-- `OPENAI_API_KEY` — Whisper + captions
-- `SITE_PASSWORD` — the shared gate for her site
-- `ADMIN_PASSWORD` — admin console at `/admin`
-- `GATHER_TOKEN` — secret path for the mom invite page (`/gather/<token>`)
+- `DATABASE_URL`: Neon connection string
+- `BLOB_READ_WRITE_TOKEN`: Vercel Blob
+- `OPENAI_API_KEY`: Whisper + captions
+- `SITE_PASSWORD`: the shared gate for her site
+- `ADMIN_PASSWORD`: admin console at `/admin`
+- `GATHER_TOKEN`: secret path for the mom invite page (`/gather/<token>`)
 
 2. Install and migrate:
 
@@ -53,7 +53,7 @@ npm run db:migrate           # apply locally
 # Vercel runs migrations automatically before next build.
 ```
 
-`npm run build` is `tsx scripts/migrate.ts && next build`. If a migration fails, the deploy fails — which is what you want.
+`npm run build` is `tsx scripts/migrate.ts && next build`. If a migration fails, the deploy fails, which is what you want.
 
 `db:push` still exists for throwaway local experiments. Prefer generate + migrate for anything that ships.
 
@@ -68,7 +68,7 @@ Test people appear in the word cloud and admin with a **test** badge. Wipe them 
 
 ## Collection first
 
-Ship `/send/[token]` immediately. Uploads go straight to Vercel Blob from the browser (multipart, progress). The app records each file as `uploaded` — processing is separate so a long iPhone video never blocks the thank-you screen.
+Ship `/send/[token]` immediately. Uploads go straight to Vercel Blob from the browser (multipart, progress). The app records each file as `uploaded`. Processing is separate so a long iPhone video never blocks the thank-you screen.
 
 ## Processing (automatic)
 
@@ -91,7 +91,7 @@ npm run process -- --id=<uuid>
 
 ## Deploy
 
-Deploy to Vercel with the same env vars (`DATABASE_URL` must be available at **build** time so migrations can run). Schema changes ship by committing files under `drizzle/` — no manual `db:push` on prod.
+Deploy to Vercel with the same env vars (`DATABASE_URL` must be available at **build** time so migrations can run). Schema changes ship by committing files under `drizzle/`. No manual `db:push` on prod.
 
 ## Build order (status)
 

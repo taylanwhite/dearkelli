@@ -10,8 +10,8 @@ export default async function AdminPeoplePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-[#F6F0E8]">People</h1>
-        <p className="mt-1 text-sm text-[#F6F0E8]/45">
+        <h1 className="text-2xl font-semibold text-[var(--cream)]">People</h1>
+        <p className="mt-1 text-sm text-[var(--cream)]/45">
           Add, edit, regenerate invite links, or remove someone.
         </p>
       </div>

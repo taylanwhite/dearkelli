@@ -111,6 +111,7 @@ export async function getPeople() {
       id: contributors.id,
       name: contributors.name,
       relationship: contributors.relationship,
+      avatarUrl: contributors.avatarUrl,
       clipCount: sql<number>`count(${media.id})::int`,
     })
     .from(contributors)
@@ -218,6 +219,7 @@ export async function searchAll(query: string) {
           id: contributors.id,
           name: contributors.name,
           relationship: contributors.relationship,
+          avatarUrl: contributors.avatarUrl,
         })
         .from(contributors)
         .where(

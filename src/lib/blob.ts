@@ -1,4 +1,4 @@
-/** Store is private — uploads and reads must use this access mode. */
+/** Store is private; uploads and reads must use this access mode. */
 export const BLOB_ACCESS = "private" as const;
 
 /** Browser-playable URL that streams a private blob through our API. */

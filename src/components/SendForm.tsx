@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PortraitUpload } from "./PortraitUpload";
 import { UploadZone } from "./UploadZone";
 
 type Contributor = {
@@ -8,6 +9,7 @@ type Contributor = {
   name: string;
   relationship: string | null;
   inviteToken: string;
+  avatarUrl?: string | null;
 };
 
 type Props = {
@@ -27,6 +29,7 @@ export function SendForm({ contributor, isGeneric }: Props) {
   const [ready, setReady] = useState(!isGeneric);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState(contributor.avatarUrl ?? null);
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
@@ -65,7 +68,12 @@ export function SendForm({ contributor, isGeneric }: Props) {
           For Kelli
         </p>
         <p className="mt-3 text-[var(--cream)]/65">
-          A memory, a voice memo, a photo — whatever you want her to hear.
+          A memory, a voice memo, a photo of you. Whatever you want her to
+          hold onto.
+        </p>
+        <p className="mt-4 text-sm leading-relaxed text-[var(--cream)]/45">
+          This page is yours forever. Come back anytime, not just for her
+          birthday. Save the link.
         </p>
       </header>
 
@@ -154,7 +162,18 @@ export function SendForm({ contributor, isGeneric }: Props) {
             </label>
           )}
 
-          <UploadZone token={contributor.inviteToken} />
+          <PortraitUpload
+            token={contributor.inviteToken}
+            initialUrl={avatarUrl}
+            onUploaded={setAvatarUrl}
+          />
+
+          <div>
+            <p className="mb-3 text-center text-sm text-[var(--cream)]/50">
+              Then anything else you want. A voice memo, a video, more photos.
+            </p>
+            <UploadZone token={contributor.inviteToken} />
+          </div>
         </div>
       )}
     </div>

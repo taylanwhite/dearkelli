@@ -10,23 +10,21 @@ type Props = { searchParams: Promise<{ from?: string }> };
 export default async function PhotosPage({ searchParams }: Props) {
   const { from } = await searchParams;
   const [photos, people] = await Promise.all([getPhotos(from), getPeople()]);
+  const fromPerson = people.find((p) => p.id === from);
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10">
-      <h1 className="font-[family-name:var(--font-display)] text-3xl text-[var(--cream)] sm:text-4xl">
-        Photos
+      <h1 className="font-[family-name:var(--font-display)] text-3xl text-[var(--forest-deep)] sm:text-4xl">
+        {fromPerson ? `From ${fromPerson.name}` : "Pictures they sent you"}
       </h1>
-      <p className="mt-2 text-[var(--cream)]/55">
-        Moments they wanted her to see.
-      </p>
 
-      <div className="mt-6 flex gap-2 overflow-x-auto pb-2">
+      <div className="mt-8 flex gap-3 overflow-x-auto pb-2">
         <Link
           href="/photos"
-          className={`shrink-0 rounded-full px-4 py-1.5 text-sm ${
+          className={`shrink-0 font-[family-name:var(--font-display)] text-lg transition ${
             !from
-              ? "bg-[var(--gold)] text-[var(--ground)]"
-              : "bg-[var(--surface)] text-[var(--cream)]/60"
+              ? "text-[var(--gold-deep)] underline decoration-[var(--gold)] underline-offset-4"
+              : "text-[var(--forest)]/45 hover:text-[var(--forest)]"
           }`}
         >
           Everyone
@@ -35,10 +33,10 @@ export default async function PhotosPage({ searchParams }: Props) {
           <Link
             key={person.id}
             href={`/photos?from=${person.id}`}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-sm ${
+            className={`shrink-0 font-[family-name:var(--font-display)] text-lg transition ${
               from === person.id
-                ? "bg-[var(--gold)] text-[var(--ground)]"
-                : "bg-[var(--surface)] text-[var(--cream)]/60"
+                ? "text-[var(--gold-deep)] underline decoration-[var(--gold)] underline-offset-4"
+                : "text-[var(--forest)]/45 hover:text-[var(--forest)]"
             }`}
           >
             {person.name}
@@ -47,13 +45,13 @@ export default async function PhotosPage({ searchParams }: Props) {
       </div>
 
       {photos.length === 0 ? (
-        <p className="mt-16 text-[var(--cream)]/50">
-          No photos yet — the album is waiting.
+        <p className="mt-16 font-[family-name:var(--font-display)] text-xl text-[var(--cream)]/50">
+          Nothing here yet. Give them a little time.
         </p>
       ) : (
-        <ul className="mt-8 columns-1 gap-4 sm:columns-2 md:columns-3">
+        <ul className="mt-10 columns-1 gap-5 sm:columns-2 md:columns-3">
           {photos.map((photo) => (
-            <li key={photo.id} className="mb-4 break-inside-avoid">
+            <li key={photo.id} className="mb-5 break-inside-avoid">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={playableUrl(photo.posterUrl || photo.blobUrl)}
@@ -62,11 +60,10 @@ export default async function PhotosPage({ searchParams }: Props) {
                   photo.title ||
                   `From ${photo.contributorName}`
                 }
-                className="w-full rounded-xl object-cover"
+                className="w-full rounded-2xl object-cover"
               />
-              <p className="mt-2 text-sm text-[var(--cream)]/50">
+              <p className="mt-2 font-[family-name:var(--font-display)] text-sm text-[var(--forest)]/70">
                 {photo.contributorName}
-                {photo.caption ? ` — ${photo.caption}` : ""}
               </p>
             </li>
           ))}
