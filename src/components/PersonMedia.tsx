@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { TrackedAvPlayer } from "@/components/TrackedAvPlayer";
+import type { TimedCaptionWord } from "@/db/schema";
 
 export type PersonMediaItem = {
   id: string;
@@ -13,6 +14,7 @@ export type PersonMediaItem = {
   summary?: string | null;
   caption?: string | null;
   alt: string;
+  timedWords?: TimedCaptionWord[] | null;
 };
 
 type Filter = "all" | "video" | "image" | "audio";
@@ -103,6 +105,7 @@ export function PersonMedia({ personName, items }: Props) {
                   poster={clip.poster}
                   title={clip.title}
                   summary={clip.summary}
+                  timedWords={clip.timedWords}
                 />
               ))}
             </section>
@@ -123,6 +126,7 @@ export function PersonMedia({ personName, items }: Props) {
                   src={clip.src}
                   title={clip.title}
                   summary={clip.summary}
+                  timedWords={clip.timedWords}
                 />
               ))}
             </section>

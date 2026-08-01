@@ -1077,6 +1077,14 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       mediaId: item.id,
       fullText: transcript.text,
       language: transcript.language ?? null,
+      // Full speech timings for captions — even words that never make the cloud.
+      timedWords: timed
+        .filter((w) => w.raw.trim())
+        .map((w) => ({
+          raw: w.raw.trim(),
+          startMs: w.startMs,
+          endMs: Math.max(w.endMs, w.startMs + 80),
+        })),
     })
     .returning();
 

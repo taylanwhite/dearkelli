@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { EnlargeableImage } from "@/components/EnlargeableImage";
 import { PersonBubble } from "@/components/PersonBubble";
+import { SyncedCaptions } from "@/components/SyncedCaptions";
 import { recordMediaView } from "@/lib/record-view";
 
 export type SupercutClip = {
+  /** Unique occurrence id (word/phrase row) — for React keys, not view tracking. */
   id: string;
+  /** The media attachment id — used for view counting. */
+  mediaId: string;
   blobUrl: string;
   kind: "video" | "audio" | "image";
   posterUrl: string | null;
@@ -17,6 +21,7 @@ export type SupercutClip = {
   relationship: string | null;
   avatarUrl: string | null;
   title: string | null;
+  timedWords?: import("@/db/schema").TimedCaptionWord[] | null;
 };
 
 type Props = {
@@ -31,17 +36,19 @@ export function Supercut({ clips, label }: Props) {
   const [playing, setPlaying] = useState(false);
   const [keepGoing, setKeepGoing] = useState(true);
   const [needsTap, setNeedsTap] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const current = clips[index];
 
   useEffect(() => {
-    if (current?.id) recordMediaView(current.id);
-  }, [current?.id]);
+    if (current?.mediaId) recordMediaView(current.mediaId);
+  }, [current?.mediaId]);
 
   useEffect(() => {
     setIndex(0);
     setPlaying(false);
     setNeedsTap(true);
+    setCurrentTime(0);
   }, [label]);
 
   useEffect(() => {
@@ -51,11 +58,10 @@ export function Supercut({ clips, label }: Props) {
       current.kind === "video" ? videoRef.current : audioRef.current;
     if (!el) return;
 
-    const start = Math.max(0, current.startMs / 1000 - 0.05);
-    const end = current.endMs / 1000 + 0.35;
-
+    // Play the whole memory from the start — no scrub-to-word.
     const onMeta = () => {
-      el.currentTime = start;
+      if (el.currentTime > 0.25) el.currentTime = 0;
+      setCurrentTime(0);
       if (playing) {
         void el.play().catch(() => {
           setPlaying(false);
@@ -67,21 +73,22 @@ export function Supercut({ clips, label }: Props) {
     if (el.readyState >= 1) onMeta();
     else el.addEventListener("loadedmetadata", onMeta, { once: true });
 
-    const onTime = () => {
-      if (el.currentTime >= end) {
-        el.pause();
-        if (keepGoing && index < clips.length - 1) {
-          setIndex((i) => i + 1);
-          setPlaying(true);
-        } else {
-          setPlaying(false);
-        }
+    const onTime = () => setCurrentTime(el.currentTime);
+
+    const onEnded = () => {
+      if (keepGoing && index < clips.length - 1) {
+        setIndex((i) => i + 1);
+        setPlaying(true);
+      } else {
+        setPlaying(false);
       }
     };
 
     el.addEventListener("timeupdate", onTime);
+    el.addEventListener("ended", onEnded);
     return () => {
       el.removeEventListener("timeupdate", onTime);
+      el.removeEventListener("ended", onEnded);
       el.pause();
     };
   }, [current, index, clips.length, playing, keepGoing]);
@@ -99,7 +106,8 @@ export function Supercut({ clips, label }: Props) {
     const el =
       current?.kind === "video" ? videoRef.current : audioRef.current;
     if (!el || !current) return;
-    el.currentTime = Math.max(0, current.startMs / 1000 - 0.05);
+    el.currentTime = 0;
+    setCurrentTime(0);
     void el.play().catch(() => {
       setPlaying(false);
       setNeedsTap(true);
@@ -205,6 +213,17 @@ export function Supercut({ clips, label }: Props) {
           />
         )}
       </div>
+
+      {current.kind !== "image" &&
+        current.timedWords &&
+        current.timedWords.length > 0 && (
+          <SyncedCaptions
+            words={current.timedWords}
+            currentTime={currentTime}
+            emphasize={label}
+            className="mt-5 text-center"
+          />
+        )}
 
       <div className="mt-8 flex justify-center">
         <PersonBubble

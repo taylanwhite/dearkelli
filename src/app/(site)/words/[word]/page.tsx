@@ -21,34 +21,32 @@ export default async function WordPage({ params, searchParams }: Props) {
     ? await getPhraseOccurrences(word)
     : await getWordOccurrences(word);
 
-  const clips = rows.map((r) => {
-    // AI tags carry placeholder timestamps (nobody "said" them), so play the
-    // whole clip instead of a fraction-of-a-second slice.
-    const isTag = "source" in r && r.source === "tag";
-    const isImage = r.kind === "image";
-    const durationMs =
-      "durationSeconds" in r && r.durationSeconds
-        ? r.durationSeconds * 1000
-        : null;
-    const startMs = isTag || isImage ? 0 : r.startMs;
-    const endMs = isTag || isImage ? (durationMs ?? 3_600_000) : r.endMs;
+  // One memory per attachment — show the whole clip, don't scrub to a word.
+  const seenMedia = new Set<string>();
+  const clips = rows.flatMap((r) => {
+    if (seenMedia.has(r.mediaId)) return [];
+    seenMedia.add(r.mediaId);
 
-    return {
-      id: "wordId" in r ? r.wordId : r.phraseId,
-      blobUrl: playbackSrc({
-        blobUrl: r.blobUrl,
-        playbackUrl: r.playbackUrl,
-      }),
-      kind: r.kind as "video" | "audio" | "image",
-      posterUrl: r.posterUrl ? playableUrl(r.posterUrl) : null,
-      startMs,
-      endMs,
-      contributorId: r.contributorId,
-      contributorName: r.contributorName,
-      relationship: r.relationship,
-      avatarUrl: r.avatarUrl,
-      title: r.title,
-    };
+    return [
+      {
+        id: "wordId" in r ? r.wordId : r.phraseId,
+        mediaId: r.mediaId,
+        blobUrl: playbackSrc({
+          blobUrl: r.blobUrl,
+          playbackUrl: r.playbackUrl,
+        }),
+        kind: r.kind as "video" | "audio" | "image",
+        posterUrl: r.posterUrl ? playableUrl(r.posterUrl) : null,
+        startMs: 0,
+        endMs: 0,
+        contributorId: r.contributorId,
+        contributorName: r.contributorName,
+        relationship: r.relationship,
+        avatarUrl: r.avatarUrl,
+        title: r.title,
+        timedWords: "timedWords" in r ? r.timedWords : null,
+      },
+    ];
   });
 
   if (clips.length === 0) {

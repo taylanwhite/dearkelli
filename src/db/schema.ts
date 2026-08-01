@@ -1,6 +1,7 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -16,6 +17,13 @@ export const mediaStatusEnum = pgEnum("media_status", [
   "ready",
   "failed",
 ]);
+
+/** Timed speech tokens for karaoke-style captions (separate from the curated word cloud). */
+export type TimedCaptionWord = {
+  raw: string;
+  startMs: number;
+  endMs: number;
+};
 
 export const contributors = pgTable(
   "contributors",
@@ -83,6 +91,8 @@ export const transcripts = pgTable("transcripts", {
     .unique(),
   fullText: text("full_text").notNull(),
   language: text("language"),
+  /** Full Whisper word timings for captions. Cloud words live in `words`. */
+  timedWords: jsonb("timed_words").$type<TimedCaptionWord[] | null>(),
 });
 
 export const words = pgTable(

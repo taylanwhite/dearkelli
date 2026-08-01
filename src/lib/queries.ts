@@ -60,6 +60,7 @@ export async function getWordOccurrences(normalized: string) {
       posterUrl: media.posterUrl,
       playbackUrl: media.playbackUrl,
       title: media.title,
+      timedWords: transcripts.timedWords,
       contributorId: contributors.id,
       contributorName: contributors.name,
       relationship: contributors.relationship,
@@ -67,6 +68,7 @@ export async function getWordOccurrences(normalized: string) {
     })
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
+    .leftJoin(transcripts, eq(transcripts.mediaId, media.id))
     .innerJoin(contributors, eq(words.contributorId, contributors.id))
     .where(
       and(
@@ -91,6 +93,7 @@ export async function getPhraseOccurrences(text: string) {
       posterUrl: media.posterUrl,
       playbackUrl: media.playbackUrl,
       title: media.title,
+      timedWords: transcripts.timedWords,
       contributorId: contributors.id,
       contributorName: contributors.name,
       relationship: contributors.relationship,
@@ -98,6 +101,7 @@ export async function getPhraseOccurrences(text: string) {
     })
     .from(phrases)
     .innerJoin(media, eq(phrases.mediaId, media.id))
+    .leftJoin(transcripts, eq(transcripts.mediaId, media.id))
     .innerJoin(contributors, eq(phrases.contributorId, contributors.id))
     .where(and(eq(phrases.text, text), eq(media.status, "ready")))
     .orderBy(contributors.name, phrases.startMs);
@@ -145,6 +149,29 @@ export async function getPerson(id: string) {
       ),
   );
 
+  const transcriptRows =
+    albumClips.length === 0
+      ? []
+      : await db
+          .select({
+            mediaId: transcripts.mediaId,
+            timedWords: transcripts.timedWords,
+          })
+          .from(transcripts)
+          .where(
+            inArray(
+              transcripts.mediaId,
+              albumClips.map((c) => c.id),
+            ),
+          );
+  const timedByMedia = new Map(
+    transcriptRows.map((t) => [t.mediaId, t.timedWords ?? null]),
+  );
+  const albumWithCaptions = albumClips.map((clip) => ({
+    ...clip,
+    timedWords: timedByMedia.get(clip.id) ?? null,
+  }));
+
   const topWordConditions = [
     eq(words.contributorId, id),
     eq(media.status, "ready"),
@@ -173,7 +200,7 @@ export async function getPerson(id: string) {
     .filter((w) => isCloudWorthyWord(w.normalized))
     .slice(0, 24);
 
-  return { person, clips: albumClips, topWords };
+  return { person, clips: albumWithCaptions, topWords };
 }
 
 export async function getPhotos(contributorId?: string) {

@@ -66,6 +66,7 @@ export default async function PersonPage({ params }: Props) {
           summary: clip.summary,
           caption: clip.summary || clip.caption,
           alt: clip.summary || clip.caption || `From ${person.name}`,
+          timedWords: clip.timedWords,
         }))}
       />
     </main>

@@ -71,6 +71,13 @@
       "when": 1785625805834,
       "tag": "0009_hesitant_pretty_boy",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785627000000,
+      "tag": "0010_transcript_timed_words",
+      "breakpoints": true
     }
   ]
 }
