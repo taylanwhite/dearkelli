@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonBubble } from "@/components/PersonBubble";
 import { PersonMedia } from "@/components/PersonMedia";
-import { playableUrl } from "@/lib/blob";
+import { playableUrl, playbackSrc } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
 export const runtime = "nodejs";
@@ -16,32 +16,23 @@ export default async function PersonPage({ params }: Props) {
   if (!data) notFound();
 
   const { person, clips, topWords } = data;
-
-  // A handful of words, no frequencies, just the flavor of their voice
   const softWords = topWords.slice(0, 8);
 
   return (
-    <main className="mx-auto max-w-2xl px-5 py-10">
-      <Link
-        href="/people"
-        className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--forest)]"
-      >
-        ← Everyone
-      </Link>
-
-      <header className="mt-10 flex flex-col items-center text-center">
+    <main className="mx-auto max-w-2xl px-5 py-5 sm:py-8">
+      <header className="flex flex-col items-center text-center">
         <PersonBubble
           name={person.name}
           relationship={person.relationship}
           avatarUrl={person.avatarUrl}
-          size="xl"
+          size="lg"
           href={null}
           showRelationship
         />
       </header>
 
       {softWords.length > 0 && (
-        <p className="mx-auto mt-8 max-w-md text-center font-[family-name:var(--font-display)] text-xl leading-relaxed text-[var(--forest)]/80">
+        <p className="mx-auto mt-4 max-w-md text-center font-[family-name:var(--font-display)] text-base leading-snug text-[var(--forest)]/80 sm:text-lg">
           {softWords.map((w, i) => (
             <span key={w.normalized}>
               {i > 0 && <span className="text-[var(--gold)]/50"> · </span>}
@@ -61,11 +52,13 @@ export default async function PersonPage({ params }: Props) {
         items={clips.map((clip) => ({
           id: clip.id,
           kind: clip.kind,
-          src: playableUrl(
+          src:
             clip.kind === "image"
-              ? clip.posterUrl || clip.blobUrl
-              : clip.blobUrl,
-          ),
+              ? playableUrl(clip.posterUrl || clip.blobUrl)
+              : playbackSrc({
+                  blobUrl: clip.blobUrl,
+                  playbackUrl: clip.playbackUrl,
+                }),
           poster: clip.posterUrl ? playableUrl(clip.posterUrl) : undefined,
           title: clip.title,
           summary: clip.summary,

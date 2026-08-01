@@ -7,3 +7,11 @@ export function playableUrl(blobUrl: string | null | undefined): string {
   if (blobUrl.startsWith("/")) return blobUrl;
   return `/api/media/stream?url=${encodeURIComponent(blobUrl)}`;
 }
+
+/** Prefer the compressed web playback file when we have one. */
+export function playbackSrc(opts: {
+  blobUrl: string;
+  playbackUrl?: string | null;
+}): string {
+  return playableUrl(opts.playbackUrl || opts.blobUrl);
+}

@@ -78,7 +78,12 @@ const PROCESSED_PUT = {
   allowOverwrite: true as const,
 };
 
-/** First real audio track (skip iPhone data/tmcd "codec none" streams). */
+type AudioMapMode =
+  | { kind: "index"; index: number }
+  | { kind: "a0" }
+  | { kind: "auto" };
+
+/** Prefer a real audio codec; still accept any audio stream if probe is fuzzy. */
 function findUsableAudioStreamIndex(
   ffmpeg: typeof import("fluent-ffmpeg"),
   inputPath: string,
@@ -86,19 +91,37 @@ function findUsableAudioStreamIndex(
   return new Promise((resolve) => {
     ffmpeg.ffprobe(inputPath, (err, data) => {
       if (err || !data?.streams?.length) {
+        console.warn(
+          "ffprobe could not list streams",
+          err instanceof Error ? err.message : err,
+        );
         resolve(null);
         return;
       }
-      const audio = data.streams.find((stream) => {
+
+      const summary = data.streams.map((s) => ({
+        index: s.index,
+        type: s.codec_type,
+        codec: s.codec_name,
+        tag: s.codec_tag_string,
+      }));
+      console.info("media streams", summary);
+
+      const usable = data.streams.find((stream) => {
+        if (stream.codec_type !== "audio") return false;
         const name = (stream.codec_name || "").toLowerCase();
-        return (
-          stream.codec_type === "audio" &&
-          name &&
-          name !== "none" &&
-          name !== "unknown"
-        );
+        // Skip explicit junk; allow missing codec_name (common on some MOVs).
+        return name !== "none" && name !== "unknown";
       });
-      resolve(typeof audio?.index === "number" ? audio.index : null);
+
+      if (usable && typeof usable.index === "number") {
+        resolve(usable.index);
+        return;
+      }
+
+      // Last resort: any stream marked audio.
+      const anyAudio = data.streams.find((s) => s.codec_type === "audio");
+      resolve(typeof anyAudio?.index === "number" ? anyAudio.index : null);
     });
   });
 }
@@ -113,30 +136,31 @@ function runAudioExtract(
     format: string;
     bitrate?: string;
     frequency?: number;
-    /** Absolute stream index from ffprobe, e.g. 1 */
-    audioStreamIndex: number | null;
+    map: AudioMapMode;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     let stderr = "";
     const mapArgs =
-      opts.audioStreamIndex != null
-        ? ["-map", `0:${opts.audioStreamIndex}`]
-        : ["-map", "0:a:0"];
+      opts.map.kind === "index"
+        ? ["-map", `0:${opts.map.index}`]
+        : opts.map.kind === "a0"
+          ? ["-map", "0:a:0"]
+          : []; // let ffmpeg pick the best audio when dropping video
 
     let cmd = ffmpeg(inputPath)
       .inputOptions([
         "-hide_banner",
         "-nostdin",
         "-analyzeduration",
-        "100M",
+        "200M",
         "-probesize",
-        "100M",
+        "200M",
       ])
       .outputOptions([
         "-vn",
         "-sn",
-        "-dn", // drop video / subtitles / data (tmcd) streams
+        "-dn",
         ...mapArgs,
         "-ac",
         "1",
@@ -162,11 +186,11 @@ function runAudioExtract(
       })
       .on("end", () => resolve())
       .on("error", (err: Error) => {
-        const detail = stderr.trim().split("\n").slice(-8).join(" | ");
+        const detail = stderr.trim().split("\n").slice(-10).join(" | ");
         reject(
           new Error(
             detail
-              ? `${err.message} (${detail.slice(0, 500)})`
+              ? `${err.message} (${detail.slice(0, 600)})`
               : err.message,
           ),
         );
@@ -175,19 +199,20 @@ function runAudioExtract(
   });
 }
 
-/** Pull a Whisper-sized soundtrack. Tries MP3, then WAV. */
+/** Pull a Whisper-sized soundtrack. Tries several map + codec strategies. */
 async function extractAudioForWhisper(
   ffmpeg: typeof import("fluent-ffmpeg"),
   inputPath: string,
   workDir: string,
   maxSeconds = 5 * 60,
 ): Promise<ExtractedAudio> {
-  const audioStreamIndex = await findUsableAudioStreamIndex(ffmpeg, inputPath);
-  if (audioStreamIndex == null) {
-    throw new Error("No usable audio track found in this file");
-  }
+  const probedIndex = await findUsableAudioStreamIndex(ffmpeg, inputPath);
 
-  const attempts: {
+  const mapModes: AudioMapMode[] = [];
+  if (probedIndex != null) mapModes.push({ kind: "index", index: probedIndex });
+  mapModes.push({ kind: "a0" }, { kind: "auto" });
+
+  const codecs: {
     filename: string;
     mime: string;
     codec: string;
@@ -210,32 +235,76 @@ async function extractAudioForWhisper(
   ];
 
   let lastError: Error | null = null;
-  for (const attempt of attempts) {
-    const outputPath = join(workDir, attempt.filename);
-    try {
-      await runAudioExtract(ffmpeg, inputPath, outputPath, {
-        maxSeconds,
-        codec: attempt.codec,
-        format: attempt.format,
-        bitrate: attempt.bitrate,
-        audioStreamIndex,
-      });
-      const buf = await readFile(outputPath);
-      if (buf.byteLength < 256) {
-        throw new Error("Extracted audio was empty");
+
+  for (const map of mapModes) {
+    for (const attempt of codecs) {
+      const outputPath = join(workDir, `${map.kind}-${attempt.filename}`);
+      try {
+        await runAudioExtract(ffmpeg, inputPath, outputPath, {
+          maxSeconds,
+          codec: attempt.codec,
+          format: attempt.format,
+          bitrate: attempt.bitrate,
+          map,
+        });
+        const buf = await readFile(outputPath);
+        if (buf.byteLength < 256) {
+          throw new Error("Extracted audio was empty");
+        }
+        return {
+          path: outputPath,
+          filename: attempt.filename,
+          mime: attempt.mime,
+        };
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(
+          `Audio extract failed map=${map.kind} format=${attempt.format}`,
+          lastError.message,
+        );
       }
-      return {
-        path: outputPath,
-        filename: attempt.filename,
-        mime: attempt.mime,
-      };
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`Audio extract via ${attempt.format} failed`, lastError);
     }
   }
 
   throw lastError || new Error("Audio extract failed");
+}
+
+function createWebPlayback(
+  ffmpeg: typeof import("fluent-ffmpeg"),
+  inputPath: string,
+  outputPath: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions([
+        "-hide_banner",
+        "-nostdin",
+        // Compact, web-friendly H.264 + AAC with moov at the front.
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "28",
+        "-pix_fmt",
+        "yuv420p",
+        "-vf",
+        "scale='min(1280,iw)':-2",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-ac",
+        "2",
+        "-movflags",
+        "+faststart",
+        "-y",
+      ])
+      .format("mp4")
+      .on("end", () => resolve())
+      .on("error", reject)
+      .save(outputPath);
+  });
 }
 
 function extractPoster(
@@ -516,6 +585,7 @@ async function markVisibleWithoutAi(
     error: string;
     duration?: number | null;
     posterUrl?: string | null;
+    playbackUrl?: string | null;
   },
 ) {
   await db
@@ -527,6 +597,7 @@ async function markVisibleWithoutAi(
         ? Math.round(opts.duration)
         : item.durationSeconds,
       posterUrl: opts.posterUrl ?? item.posterUrl,
+      playbackUrl: opts.playbackUrl ?? item.playbackUrl,
       title:
         item.title ||
         (item.kind === "audio"
@@ -560,6 +631,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
 
   let duration: number | null = item.durationSeconds;
   let posterUrl = item.posterUrl;
+  let playbackUrl = item.playbackUrl;
   let ffmpegAvailable = true;
   let ffmpeg: typeof import("fluent-ffmpeg") | null = null;
 
@@ -590,6 +662,21 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       } catch (err) {
         console.warn("Poster extraction failed", err);
       }
+
+      // Build a smaller fast-start MP4 so the site doesn't stream a huge MOV.
+      try {
+        const playbackPath = join(workDir, "playback.mp4");
+        await createWebPlayback(ffmpeg, sourcePath, playbackPath);
+        const playbackBuf = await readFile(playbackPath);
+        const playbackBlob = await put(
+          `processed/${item.id}/playback.mp4`,
+          playbackBuf,
+          { ...PROCESSED_PUT, contentType: "video/mp4" },
+        );
+        playbackUrl = playbackBlob.url;
+      } catch (err) {
+        console.warn("Web playback encode failed", err);
+      }
     }
 
     // Always pull a compact soundtrack for video (iPhone MOVs are often
@@ -609,12 +696,11 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         const detail =
           err instanceof Error ? err.message : "unknown extract error";
         console.warn("Audio extract failed", err);
-        // Do not blame "file too large" — short 4K MOVs are big in bytes.
-        // If extract failed, we cannot send the giant video to Whisper.
         await markVisibleWithoutAi(item, {
           error: `Couldn't extract audio for transcription: ${detail}`,
           duration,
           posterUrl,
+          playbackUrl,
         });
         return;
       }
@@ -625,6 +711,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         "Couldn't transcribe without ffmpeg on this server. The file still shows for Kelli.",
       duration,
       posterUrl,
+      playbackUrl,
     });
     return;
   }
@@ -644,6 +731,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       error: `Transcription failed: ${message}`,
       duration,
       posterUrl,
+      playbackUrl,
     });
     return;
   }
@@ -760,6 +848,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       processingError: null,
       durationSeconds: duration ? Math.round(duration) : item.durationSeconds,
       posterUrl,
+      playbackUrl,
       title: enrichment.title,
       summary: enrichment.summary,
       themes,

@@ -28,10 +28,11 @@ export function TrackedAvPlayer({
           controls
           playsInline
           className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
+          preload="metadata"
           onPlay={() => recordMediaView(id)}
         />
       ) : (
-        <div className="rounded-2xl bg-[var(--surface)] px-5 py-8">
+        <div className="rounded-2xl bg-[var(--surface)] px-4 py-5">
           <audio
             src={src}
             controls
@@ -41,7 +42,7 @@ export function TrackedAvPlayer({
         </div>
       )}
       {(title || summary) && (
-        <p className="mt-4 font-[family-name:var(--font-display)] text-lg leading-snug text-[var(--forest-deep)]">
+        <p className="mt-2 font-[family-name:var(--font-display)] text-base leading-snug text-[var(--forest-deep)]">
           {summary || title}
         </p>
       )}

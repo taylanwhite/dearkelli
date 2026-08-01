@@ -46,6 +46,8 @@ export const media = pgTable(
     width: integer("width"),
     height: integer("height"),
     posterUrl: text("poster_url"),
+    /** Smaller H.264/AAC MP4 for smooth playback (original stays on blobUrl). */
+    playbackUrl: text("playback_url"),
     status: mediaStatusEnum("status").notNull().default("uploaded"),
     title: text("title"),
     summary: text("summary"),

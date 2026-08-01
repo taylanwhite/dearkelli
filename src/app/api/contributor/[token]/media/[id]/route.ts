@@ -91,7 +91,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const urls = [item.blobUrl, item.posterUrl].filter(
+  const urls = [item.blobUrl, item.posterUrl, item.playbackUrl].filter(
     (url): url is string => Boolean(url),
   );
 

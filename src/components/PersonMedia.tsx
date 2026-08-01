@@ -53,22 +53,22 @@ export function PersonMedia({ personName, items }: Props) {
 
   if (items.length === 0) {
     return (
-      <p className="mt-16 text-center font-[family-name:var(--font-display)] text-xl text-[var(--cream)]/50">
+      <p className="mt-8 text-center font-[family-name:var(--font-display)] text-lg text-[var(--cream)]/50">
         Nothing from them yet.
       </p>
     );
   }
 
   return (
-    <div className="mt-14">
+    <div className="mt-6">
       {available.length > 2 && (
-        <div className="mb-10 flex flex-wrap justify-center gap-2">
+        <div className="mb-5 flex flex-wrap justify-center gap-2">
           {available.map((f) => (
             <button
               key={f.id}
               type="button"
               onClick={() => setFilter(f.id)}
-              className={`min-h-10 rounded-full px-4 text-sm touch-manipulation transition ${
+              className={`min-h-9 rounded-full px-3.5 text-sm touch-manipulation transition ${
                 active === f.id
                   ? "bg-[var(--ink)] text-[var(--ground)]"
                   : "border border-[var(--line)] text-[var(--muted)] hover:text-[var(--ink)]"
@@ -86,11 +86,11 @@ export function PersonMedia({ personName, items }: Props) {
           Nothing in this view.
         </p>
       ) : (
-        <div className="space-y-14">
+        <div className="space-y-8">
           {videos.length > 0 && (
-            <section className="space-y-10">
+            <section className="space-y-6">
               {active === "all" && (
-                <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--forest-deep)]">
+                <h2 className="mb-1 font-[family-name:var(--font-display)] text-base text-[var(--forest-deep)]">
                   Video
                 </h2>
               )}
@@ -109,9 +109,9 @@ export function PersonMedia({ personName, items }: Props) {
           )}
 
           {audio.length > 0 && (
-            <section className="space-y-10">
+            <section className="space-y-5">
               {active === "all" && (
-                <h2 className="font-[family-name:var(--font-display)] text-lg text-[var(--forest-deep)]">
+                <h2 className="mb-1 font-[family-name:var(--font-display)] text-base text-[var(--forest-deep)]">
                   Audio
                 </h2>
               )}
@@ -131,7 +131,7 @@ export function PersonMedia({ personName, items }: Props) {
           {photos.length > 0 && (
             <section>
               {active === "all" && (
-                <h2 className="mb-6 font-[family-name:var(--font-display)] text-lg text-[var(--forest-deep)]">
+                <h2 className="mb-3 font-[family-name:var(--font-display)] text-base text-[var(--forest-deep)]">
                   Photos
                 </h2>
               )}

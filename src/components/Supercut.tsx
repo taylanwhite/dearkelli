@@ -127,6 +127,7 @@ export function Supercut({ clips, label }: Props) {
               playsInline
               controls
               controlsList="nodownload"
+              preload="metadata"
               className="aspect-video w-full bg-[var(--sage-deep)] object-contain"
               onPlay={() => {
                 setPlaying(true);
