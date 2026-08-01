@@ -6,6 +6,7 @@ import {
   SyncedCaptions,
   useMediaCurrentTime,
 } from "@/components/SyncedCaptions";
+import { pauseOtherMedia } from "@/lib/sole-media";
 import { recordMediaView } from "@/lib/record-view";
 
 type Props = {
@@ -37,6 +38,12 @@ export function TrackedAvPlayer({
     setEl(node);
   }
 
+  function onPlay(e: React.SyntheticEvent<HTMLMediaElement>) {
+    pauseOtherMedia(e.currentTarget);
+    setPlaying(true);
+    recordMediaView(id);
+  }
+
   return (
     <article>
       {kind === "video" ? (
@@ -51,10 +58,7 @@ export function TrackedAvPlayer({
           playsInline
           className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
           preload="none"
-          onPlay={() => {
-            setPlaying(true);
-            recordMediaView(id);
-          }}
+          onPlay={onPlay}
           onPause={() => setPlaying(false)}
         />
       ) : (
@@ -66,10 +70,7 @@ export function TrackedAvPlayer({
             controlsList="nodownload noplaybackrate"
             preload="none"
             className="w-full"
-            onPlay={() => {
-              setPlaying(true);
-              recordMediaView(id);
-            }}
+            onPlay={onPlay}
             onPause={() => setPlaying(false)}
           />
         </div>

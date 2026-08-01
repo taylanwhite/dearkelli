@@ -5,6 +5,7 @@ import {
   LightboxOverlay,
   type LightboxPhoto,
 } from "@/components/LightboxOverlay";
+import { pauseOtherMedia } from "@/lib/sole-media";
 
 export type UploadItem = {
   id: string;
@@ -230,6 +231,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                     controls
                     controlsList="nodownload noplaybackrate"
                     className="w-full"
+                    onPlay={(e) => pauseOtherMedia(e.currentTarget)}
                   />
                 </div>
               </li>
@@ -270,6 +272,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                     controlsList="nodownload noplaybackrate"
                     disablePictureInPicture
                     disableRemotePlayback
+                    onPlay={(e) => pauseOtherMedia(e.currentTarget)}
                   />
                 )}
               </div>

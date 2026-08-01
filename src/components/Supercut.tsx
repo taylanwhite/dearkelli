@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { EnlargeableImage } from "@/components/EnlargeableImage";
 import { PersonBubble } from "@/components/PersonBubble";
 import { SyncedCaptions } from "@/components/SyncedCaptions";
+import type { TimedCaptionWord } from "@/db/schema";
+import { pauseOtherMedia } from "@/lib/sole-media";
 import { recordMediaView } from "@/lib/record-view";
 
 export type SupercutClip = {
@@ -21,7 +23,7 @@ export type SupercutClip = {
   relationship: string | null;
   avatarUrl: string | null;
   title: string | null;
-  timedWords?: import("@/db/schema").TimedCaptionWord[] | null;
+  timedWords?: TimedCaptionWord[] | null;
 };
 
 type Props = {
@@ -32,12 +34,16 @@ type Props = {
 export function Supercut({ clips, label }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  /** When true, the next clip mount should autoplay (Next / keep-going). */
+  const autoplayRef = useRef(false);
+  const keepGoingRef = useRef(true);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [keepGoing, setKeepGoing] = useState(true);
   const [needsTap, setNeedsTap] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
 
+  keepGoingRef.current = keepGoing;
   const current = clips[index];
 
   useEffect(() => {
@@ -49,8 +55,12 @@ export function Supercut({ clips, label }: Props) {
     setPlaying(false);
     setNeedsTap(true);
     setCurrentTime(0);
+    autoplayRef.current = false;
   }, [label]);
 
+  // Bind listeners + optional autoplay when the clip changes.
+  // Intentionally does NOT depend on `playing` — that caused a play/pause loop
+  // (effect cleanup paused → onPause → setPlaying(false) → effect re-ran → play…).
   useEffect(() => {
     if (!current || current.kind === "image") return;
 
@@ -58,40 +68,39 @@ export function Supercut({ clips, label }: Props) {
       current.kind === "video" ? videoRef.current : audioRef.current;
     if (!el) return;
 
-    // Play the whole memory from the start — no scrub-to-word.
-    const onMeta = () => {
-      if (el.currentTime > 0.25) el.currentTime = 0;
-      setCurrentTime(0);
-      if (playing) {
-        void el.play().catch(() => {
-          setPlaying(false);
-          setNeedsTap(true);
-        });
-      }
-    };
-
-    if (el.readyState >= 1) onMeta();
-    else el.addEventListener("loadedmetadata", onMeta, { once: true });
-
     const onTime = () => setCurrentTime(el.currentTime);
-
     const onEnded = () => {
-      if (keepGoing && index < clips.length - 1) {
+      if (keepGoingRef.current && index < clips.length - 1) {
+        autoplayRef.current = true;
+        setNeedsTap(false);
         setIndex((i) => i + 1);
-        setPlaying(true);
       } else {
+        autoplayRef.current = false;
         setPlaying(false);
       }
     };
 
     el.addEventListener("timeupdate", onTime);
     el.addEventListener("ended", onEnded);
+
+    el.currentTime = 0;
+    setCurrentTime(0);
+
+    if (autoplayRef.current) {
+      autoplayRef.current = false;
+      pauseOtherMedia(el);
+      void el.play().catch(() => {
+        setPlaying(false);
+        setNeedsTap(true);
+      });
+    }
+
     return () => {
       el.removeEventListener("timeupdate", onTime);
       el.removeEventListener("ended", onEnded);
       el.pause();
     };
-  }, [current, index, clips.length, playing, keepGoing]);
+  }, [current, index, clips.length]);
 
   useEffect(() => {
     return () => {
@@ -100,18 +109,27 @@ export function Supercut({ clips, label }: Props) {
     };
   }, []);
 
+  function mediaEl() {
+    return current?.kind === "video" ? videoRef.current : audioRef.current;
+  }
+
   function startPlayback() {
-    setNeedsTap(false);
-    setPlaying(true);
-    const el =
-      current?.kind === "video" ? videoRef.current : audioRef.current;
+    const el = mediaEl();
     if (!el || !current) return;
+    setNeedsTap(false);
     el.currentTime = 0;
     setCurrentTime(0);
+    pauseOtherMedia(el);
     void el.play().catch(() => {
       setPlaying(false);
       setNeedsTap(true);
     });
+  }
+
+  function goTo(next: number) {
+    autoplayRef.current = true;
+    setNeedsTap(false);
+    setIndex(next);
   }
 
   if (!current) {
@@ -139,7 +157,8 @@ export function Supercut({ clips, label }: Props) {
               disableRemotePlayback
               preload="none"
               className="aspect-video w-full bg-[var(--sage-deep)] object-contain"
-              onPlay={() => {
+              onPlay={(e) => {
+                pauseOtherMedia(e.currentTarget);
                 setPlaying(true);
                 setNeedsTap(false);
               }}
@@ -171,7 +190,8 @@ export function Supercut({ clips, label }: Props) {
               controlsList="nodownload noplaybackrate"
               preload="none"
               className="w-full max-w-md"
-              onPlay={() => {
+              onPlay={(e) => {
+                pauseOtherMedia(e.currentTarget);
                 setPlaying(true);
                 setNeedsTap(false);
               }}
@@ -247,11 +267,7 @@ export function Supercut({ clips, label }: Props) {
         <button
           type="button"
           disabled={index === 0}
-          onClick={() => {
-            setPlaying(true);
-            setNeedsTap(false);
-            setIndex((i) => Math.max(0, i - 1));
-          }}
+          onClick={() => goTo(Math.max(0, index - 1))}
           className="min-h-11 rounded-full border border-[var(--line)] px-6 py-3 text-sm text-[var(--sage)] touch-manipulation disabled:opacity-30"
         >
           Before
@@ -259,11 +275,7 @@ export function Supercut({ clips, label }: Props) {
         <button
           type="button"
           disabled={index >= clips.length - 1}
-          onClick={() => {
-            setPlaying(true);
-            setNeedsTap(false);
-            setIndex((i) => Math.min(clips.length - 1, i + 1));
-          }}
+          onClick={() => goTo(Math.min(clips.length - 1, index + 1))}
           className="min-h-11 rounded-full border border-[var(--line)] px-6 py-3 text-sm text-[var(--sage)] touch-manipulation disabled:opacity-30"
         >
           Next voice
@@ -289,11 +301,7 @@ export function Supercut({ clips, label }: Props) {
                 avatarUrl={clip.avatarUrl}
                 size="sm"
                 selected={i === index}
-                onClick={() => {
-                  setIndex(i);
-                  setPlaying(true);
-                  setNeedsTap(false);
-                }}
+                onClick={() => goTo(i)}
               />
             </li>
           ))}
