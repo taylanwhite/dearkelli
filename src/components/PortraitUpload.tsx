@@ -20,6 +20,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
     initialUrl ? "done" : "idle",
   );
   const [error, setError] = useState<string | null>(null);
+  const [thanks, setThanks] = useState(false);
 
   useEffect(() => {
     setRemoteUrl(initialUrl ?? null);
@@ -31,6 +32,12 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
     }
   }, [initialUrl]);
 
+  useEffect(() => {
+    if (!thanks) return;
+    const t = window.setTimeout(() => setThanks(false), 2800);
+    return () => window.clearTimeout(t);
+  }, [thanks]);
+
   const previewSrc = localPreview
     ? localPreview
     : remoteUrl
@@ -39,6 +46,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
 
   async function handleFile(file: File) {
     setError(null);
+    setThanks(false);
 
     if (isOverUploadLimit(file.size, "image")) {
       setStatus("error");
@@ -76,6 +84,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
       setLocalPreview(null);
       URL.revokeObjectURL(local);
       setStatus("done");
+      setThanks(true);
       onUploaded?.(blob.url);
     } catch (err) {
       setStatus("error");
@@ -128,7 +137,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
         }}
       />
 
-      {status === "done" && (
+      {thanks && (
         <p className="mt-3 text-sm text-[var(--gold)]">Got it. Thank you.</p>
       )}
       {error && <p className="mt-3 text-sm text-[var(--blush)]">{error}</p>}

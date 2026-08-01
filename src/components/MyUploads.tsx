@@ -85,7 +85,7 @@ function AttachmentNote({
           onBlur={() => void save()}
           rows={2}
           maxLength={280}
-          placeholder="A quick note for Kelli…"
+          placeholder="A quick note about this memory"
           className="mt-1.5 w-full resize-none rounded-xl border border-[var(--cream)]/15 bg-[var(--ground)] px-2.5 py-2 text-sm leading-snug text-[var(--cream)] placeholder:text-[var(--cream)]/35 focus:border-[var(--cream)]/35 focus:outline-none"
         />
       </label>
@@ -203,6 +203,39 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item) => {
           const galleryIndex = imageGallery.findIndex((p) => p.id === item.id);
+
+          if (item.kind === "audio") {
+            return (
+              <li
+                key={item.id}
+                className="overflow-hidden rounded-2xl border border-[var(--cream)]/20 bg-[var(--surface)] shadow-[0_4px_16px_rgba(58,53,50,0.12)] sm:col-span-2"
+              >
+                <div className="flex items-center justify-between gap-2 px-3 pt-3">
+                  <span className="text-xs font-medium text-[var(--cream)]/80">
+                    Voice
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void remove(item)}
+                    disabled={removingId === item.id}
+                    className="shrink-0 text-xs font-medium text-[var(--rose-deep)] underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    {removingId === item.id ? "…" : "Remove"}
+                  </button>
+                </div>
+                <div className="px-3 pb-3 pt-2">
+                  <audio
+                    src={item.previewUrl}
+                    controls
+                    controlsList="nodownload noplaybackrate"
+                    preload="metadata"
+                    className="w-full"
+                  />
+                </div>
+              </li>
+            );
+          }
+
           return (
             <li
               key={item.id}
@@ -225,7 +258,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                       className="h-full w-full object-cover"
                     />
                   </button>
-                ) : item.kind === "video" ? (
+                ) : (
                   <video
                     src={item.previewUrl}
                     poster={item.posterPreviewUrl || undefined}
@@ -234,15 +267,10 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                     playsInline
                     preload="metadata"
                     controls
+                    controlsList="nodownload noplaybackrate"
+                    disablePictureInPicture
+                    disableRemotePlayback
                   />
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-[var(--surface)] px-3 text-center">
-                    <audio
-                      src={item.previewUrl}
-                      controls
-                      className="w-full max-w-[90%]"
-                    />
-                  </div>
                 )}
               </div>
               <div className="flex items-center justify-between gap-2 bg-[var(--surface)] px-3 py-2.5">
@@ -258,19 +286,17 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                   {removingId === item.id ? "…" : "Remove"}
                 </button>
               </div>
-              {item.kind !== "audio" && (
-                <AttachmentNote
-                  token={token}
-                  item={item}
-                  onSaved={(id, summary) =>
-                    setItems((prev) =>
-                      prev.map((row) =>
-                        row.id === id ? { ...row, summary } : row,
-                      ),
-                    )
-                  }
-                />
-              )}
+              <AttachmentNote
+                token={token}
+                item={item}
+                onSaved={(id, summary) =>
+                  setItems((prev) =>
+                    prev.map((row) =>
+                      row.id === id ? { ...row, summary } : row,
+                    ),
+                  )
+                }
+              />
             </li>
           );
         })}

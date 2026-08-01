@@ -126,7 +126,9 @@ export function Supercut({ clips, label }: Props) {
               poster={current.posterUrl ?? undefined}
               playsInline
               controls
-              controlsList="nodownload"
+              controlsList="nodownload noplaybackrate"
+              disablePictureInPicture
+              disableRemotePlayback
               preload="metadata"
               className="aspect-video w-full bg-[var(--sage-deep)] object-contain"
               onPlay={() => {
@@ -158,6 +160,7 @@ export function Supercut({ clips, label }: Props) {
               ref={audioRef}
               src={current.blobUrl}
               controls
+              controlsList="nodownload noplaybackrate"
               className="w-full max-w-md"
               onPlay={() => {
                 setPlaying(true);

@@ -14,7 +14,7 @@ const PROMPTS = [
   "We love you",
   "I'm so proud of you",
   "You're my favorite person",
-  "Thank you for being you",
+  "I remember when …",
 ];
 
 type Phase = "idle" | "recording" | "review" | "uploading" | "done" | "error";
@@ -309,7 +309,12 @@ export function VoiceRecorder({ token, onSent }: Props) {
 
           {phase === "review" && previewUrl && (
             <>
-              <audio src={previewUrl} controls className="w-full max-w-sm" />
+              <audio
+                src={previewUrl}
+                controls
+                controlsList="nodownload noplaybackrate"
+                className="w-full max-w-sm"
+              />
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <button
                   type="button"

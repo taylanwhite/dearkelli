@@ -25,6 +25,9 @@ export function TrackedAvPlayer({
           src={src}
           poster={poster}
           controls
+          controlsList="nodownload noplaybackrate"
+          disablePictureInPicture
+          disableRemotePlayback
           playsInline
           className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
           preload="metadata"
@@ -35,6 +38,7 @@ export function TrackedAvPlayer({
           <audio
             src={src}
             controls
+            controlsList="nodownload noplaybackrate"
             className="w-full"
             onPlay={() => recordMediaView(id)}
           />
