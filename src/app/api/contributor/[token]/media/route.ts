@@ -34,6 +34,7 @@ export async function GET(_request: Request, { params }: Params) {
       status: media.status,
       blobUrl: media.blobUrl,
       posterUrl: media.posterUrl,
+      playbackUrl: media.playbackUrl,
       originalFilename: media.originalFilename,
       title: media.title,
       caption: media.caption,
@@ -48,14 +49,26 @@ export async function GET(_request: Request, { params }: Params) {
 
   return NextResponse.json({
     avatarUrl: contributor.avatarUrl,
-    media: rows.map((row) => ({
-      ...row,
-      tags: row.tags || [],
-      themes: row.themes || [],
-      previewUrl: playableUrl(row.posterUrl || row.blobUrl),
-      isAvatar: Boolean(
-        contributor.avatarUrl && contributor.avatarUrl === row.blobUrl,
-      ),
-    })),
+    media: rows.map((row) => {
+      const previewSource =
+        row.kind === "image"
+          ? row.posterUrl || row.blobUrl
+          : row.kind === "video"
+            ? row.playbackUrl || row.blobUrl
+            : row.blobUrl;
+
+      return {
+        ...row,
+        tags: row.tags || [],
+        themes: row.themes || [],
+        previewUrl: playableUrl(previewSource, { token }),
+        posterPreviewUrl: row.posterUrl
+          ? playableUrl(row.posterUrl, { token })
+          : null,
+        isAvatar: Boolean(
+          contributor.avatarUrl && contributor.avatarUrl === row.blobUrl,
+        ),
+      };
+    }),
   });
 }

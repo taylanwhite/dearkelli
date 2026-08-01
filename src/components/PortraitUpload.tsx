@@ -34,7 +34,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
   const previewSrc = localPreview
     ? localPreview
     : remoteUrl
-      ? playableUrl(remoteUrl)
+      ? playableUrl(remoteUrl, { token })
       : null;
 
   async function handleFile(file: File) {

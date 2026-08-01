@@ -19,8 +19,9 @@ const PUBLIC_PREFIXES = [
 ];
 
 function isPublic(pathname: string) {
-  // Private blob streaming requires the site/admin cookie.
-  if (pathname.startsWith("/api/media/stream")) return false;
+  // Auth for streaming is enforced in the route (site/admin cookie, or a
+  // contributor invite token that owns the blob).
+  if (pathname.startsWith("/api/media/stream")) return true;
 
   return PUBLIC_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),

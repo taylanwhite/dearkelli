@@ -1,26 +1,60 @@
 import { get } from "@vercel/blob";
+import { and, eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { contributors, media } from "@/db/schema";
 import { isAdminAuthenticated, isAuthenticated } from "@/lib/auth";
 import { BLOB_ACCESS } from "@/lib/blob";
 
 export const runtime = "nodejs";
 
+async function contributorCanAccessBlob(
+  inviteToken: string,
+  blobUrl: string,
+): Promise<boolean> {
+  const [contributor] = await db
+    .select({
+      id: contributors.id,
+      avatarUrl: contributors.avatarUrl,
+    })
+    .from(contributors)
+    .where(eq(contributors.inviteToken, inviteToken))
+    .limit(1);
+
+  if (!contributor) return false;
+  if (contributor.avatarUrl === blobUrl) return true;
+
+  const [owned] = await db
+    .select({ id: media.id })
+    .from(media)
+    .where(
+      and(
+        eq(media.contributorId, contributor.id),
+        or(
+          eq(media.blobUrl, blobUrl),
+          eq(media.posterUrl, blobUrl),
+          eq(media.playbackUrl, blobUrl),
+        ),
+      ),
+    )
+    .limit(1);
+
+  return Boolean(owned);
+}
+
 /**
  * Stream a private blob to the browser.
  * Forwards Range requests so video/audio can start quickly without
  * downloading the whole file through our function first.
+ *
+ * Allowed for: site (Kelli), admin, or a contributor invite token that
+ * owns the requested blob (so send-page previews work).
  */
 export async function GET(request: Request) {
-  const allowed =
-    (await isAuthenticated().catch(() => false)) ||
-    (await isAdminAuthenticated().catch(() => false));
-
-  if (!allowed) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(request.url);
   const url = searchParams.get("url");
+  const inviteToken = searchParams.get("token");
+
   if (!url) {
     return NextResponse.json({ error: "Missing url" }, { status: 400 });
   }
@@ -32,6 +66,22 @@ export async function GET(request: Request) {
     }
   } catch {
     return NextResponse.json({ error: "Invalid url" }, { status: 400 });
+  }
+
+  const siteOrAdmin =
+    (await isAuthenticated().catch(() => false)) ||
+    (await isAdminAuthenticated().catch(() => false));
+
+  if (!siteOrAdmin) {
+    if (!inviteToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const owns = await contributorCanAccessBlob(inviteToken, url).catch(
+      () => false,
+    );
+    if (!owns) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   // Processed assets (poster/thumb/full/playback) are immutable per URL, so

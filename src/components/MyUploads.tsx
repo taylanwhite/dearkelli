@@ -11,6 +11,7 @@ export type UploadItem = {
   kind: "video" | "audio" | "image";
   status: string;
   previewUrl: string;
+  posterPreviewUrl?: string | null;
   originalFilename: string | null;
   title: string | null;
   summary: string | null;
@@ -227,6 +228,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                 ) : item.kind === "video" ? (
                   <video
                     src={item.previewUrl}
+                    poster={item.posterPreviewUrl || undefined}
                     className="h-full w-full object-cover"
                     muted
                     playsInline

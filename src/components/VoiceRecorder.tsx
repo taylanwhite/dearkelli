@@ -323,7 +323,7 @@ export function VoiceRecorder({ token, onSent }: Props) {
                   onClick={() => void send()}
                   className="min-h-11 rounded-full bg-[var(--gold)] px-6 text-sm font-medium text-[var(--ground)] touch-manipulation"
                 >
-                  Send to Kelli
+                  Save
                 </button>
               </div>
             </>
