@@ -30,8 +30,10 @@ export default async function WordPage({ params, searchParams }: Props) {
       posterUrl: r.posterUrl ? playableUrl(r.posterUrl) : null,
       startMs: r.startMs,
       endMs: r.endMs,
+      contributorId: r.contributorId,
       contributorName: r.contributorName,
       relationship: r.relationship,
+      avatarUrl: r.avatarUrl,
       title: r.title,
     }));
 

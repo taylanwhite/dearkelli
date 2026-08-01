@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PersonBubble } from "@/components/PersonBubble";
 
 export type SupercutClip = {
   id: string;
@@ -9,8 +10,10 @@ export type SupercutClip = {
   posterUrl: string | null;
   startMs: number;
   endMs: number;
+  contributorId: string;
   contributorName: string;
   relationship: string | null;
+  avatarUrl: string | null;
   title: string | null;
 };
 
@@ -176,13 +179,15 @@ export function Supercut({ clips, label }: Props) {
         )}
       </div>
 
-      <div className="mt-6 text-center">
-        <p className="font-[family-name:var(--font-display)] text-2xl text-[var(--ink)]">
-          {current.contributorName}
-        </p>
-        {current.relationship && (
-          <p className="mt-1 text-[var(--rose-deep)]">{current.relationship}</p>
-        )}
+      <div className="mt-8 flex justify-center">
+        <PersonBubble
+          id={current.contributorId}
+          name={current.contributorName}
+          relationship={current.relationship}
+          avatarUrl={current.avatarUrl}
+          size="lg"
+          showRelationship
+        />
       </div>
 
       <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -230,24 +235,20 @@ export function Supercut({ clips, label }: Props) {
       </label>
 
       {clips.length > 1 && (
-        <ul className="mt-12 flex flex-wrap justify-center gap-2">
+        <ul className="mt-12 flex flex-wrap justify-center gap-4">
           {clips.map((clip, i) => (
             <li key={clip.id}>
-              <button
-                type="button"
+              <PersonBubble
+                name={clip.contributorName}
+                avatarUrl={clip.avatarUrl}
+                size="sm"
+                selected={i === index}
                 onClick={() => {
                   setIndex(i);
                   setPlaying(true);
                   setNeedsTap(false);
                 }}
-                className={`min-h-11 rounded-full px-4 py-2 font-[family-name:var(--font-display)] text-lg transition touch-manipulation ${
-                  i === index
-                    ? "bg-[var(--surface)] text-[var(--rose-deep)] underline decoration-[var(--rose)] underline-offset-4"
-                    : "text-[var(--sage)]/55 active:text-[var(--sage)]"
-                }`}
-              >
-                {clip.contributorName}
-              </button>
+              />
             </li>
           ))}
         </ul>

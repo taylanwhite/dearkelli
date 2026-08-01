@@ -47,6 +47,7 @@ export default async function SearchPage({ searchParams }: Props) {
                   relationship={p.relationship}
                   avatarUrl={p.avatarUrl}
                   size={i % 4 === 0 ? "lg" : "md"}
+                  showRelationship
                 />
               </li>
             ))}

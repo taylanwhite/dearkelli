@@ -1,7 +1,7 @@
 "use client";
 
 import { upload } from "@vercel/blob/client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { playableUrl } from "@/lib/blob";
 
 type Props = {
@@ -18,6 +18,17 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
     initialUrl ? "done" : "idle",
   );
   const [error, setError] = useState<string | null>(null);
+
+  // Keep preview in sync when parent clears the avatar (e.g. removed from list)
+  useEffect(() => {
+    setRemoteUrl(initialUrl ?? null);
+    if (initialUrl) {
+      setStatus("done");
+    } else {
+      setLocalPreview(null);
+      setStatus((prev) => (prev === "uploading" ? prev : "idle"));
+    }
+  }, [initialUrl]);
 
   const previewSrc = localPreview
     ? localPreview

@@ -18,6 +18,54 @@ type Props = {
   onAllSettled?: () => void;
 };
 
+type MediaKind = "image" | "video" | "audio" | "other";
+
+function kindFromFile(file: File): MediaKind {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("audio/")) return "audio";
+  const name = file.name.toLowerCase();
+  if (/\.(heic|heif|jpe?g|png|gif|webp)$/.test(name)) return "image";
+  if (/\.(mp4|mov|m4v|webm)$/.test(name)) return "video";
+  if (/\.(m4a|mp3|wav|aac|ogg|caf)$/.test(name)) return "audio";
+  return "other";
+}
+
+function thankYouCopy(done: TrackedFile[]) {
+  const kinds = new Set(done.map((f) => kindFromFile(f.file)));
+  const plural = done.length > 1;
+
+  if (kinds.size === 1 && kinds.has("image")) {
+    return {
+      title: "Thank you.",
+      body: plural
+        ? "She'll love seeing these."
+        : "I'm sure she'll love to see this.",
+    };
+  }
+  if (kinds.size === 1 && kinds.has("video")) {
+    return {
+      title: "Thank you.",
+      body: plural
+        ? "She'll love watching these."
+        : "She'll love watching this.",
+    };
+  }
+  if (kinds.size === 1 && kinds.has("audio")) {
+    return {
+      title: "Thank you.",
+      body: plural
+        ? "She'll cherish every word."
+        : "She'll cherish every word.",
+    };
+  }
+
+  return {
+    title: "Thank you.",
+    body: "She'll be so glad you shared these.",
+  };
+}
+
 function readMediaMeta(
   file: File,
 ): Promise<{ width?: number; height?: number; durationSeconds?: number }> {
@@ -170,21 +218,21 @@ export function UploadZone({ token, onAllSettled }: Props) {
     [onAllSettled, uploadOne],
   );
 
-  const doneCount = files.filter((f) => f.status === "done").length;
+  const doneFiles = files.filter((f) => f.status === "done");
   const allDone =
-    files.length > 0 && files.every((f) => f.status === "done" || f.status === "error");
-  const anyDone = doneCount > 0;
+    files.length > 0 &&
+    files.every((f) => f.status === "done" || f.status === "error");
+  const anyDone = doneFiles.length > 0;
+  const thanks = anyDone ? thankYouCopy(doneFiles) : null;
 
   return (
     <div className="space-y-6">
-      {allDone && anyDone ? (
+      {allDone && thanks ? (
         <div className="rounded-2xl bg-[var(--surface)] px-6 py-8 text-center">
           <p className="font-[family-name:var(--font-display)] text-2xl text-[var(--gold)]">
-            Thank you.
+            {thanks.title}
           </p>
-          <p className="mt-3 text-[var(--cream)]/80">
-            She&apos;ll hear every word. Want to add another?
-          </p>
+          <p className="mt-3 text-[var(--cream)]/80">{thanks.body}</p>
           <button
             type="button"
             onClick={() => {

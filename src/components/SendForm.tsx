@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { MyUploads } from "./MyUploads";
 import { PortraitUpload } from "./PortraitUpload";
 import { UploadZone } from "./UploadZone";
 
@@ -30,6 +31,7 @@ export function SendForm({ contributor, isGeneric }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState(contributor.avatarUrl ?? null);
+  const [uploadsKey, setUploadsKey] = useState(0);
 
   async function saveDetails(e: React.FormEvent) {
     e.preventDefault();
@@ -72,8 +74,8 @@ export function SendForm({ contributor, isGeneric }: Props) {
           hold onto.
         </p>
         <p className="mt-4 text-sm leading-relaxed text-[var(--cream)]/45">
-          This page is yours forever. Come back anytime, not just for her
-          birthday. Save the link.
+          Feel free to come back and add more for Kelli throughout the years.
+          Things she&apos;d like to see. Save this link.
         </p>
       </header>
 
@@ -165,15 +167,27 @@ export function SendForm({ contributor, isGeneric }: Props) {
           <PortraitUpload
             token={contributor.inviteToken}
             initialUrl={avatarUrl}
-            onUploaded={setAvatarUrl}
+            onUploaded={(url) => {
+              setAvatarUrl(url);
+              setUploadsKey((k) => k + 1);
+            }}
           />
 
           <div>
             <p className="mb-3 text-center text-sm text-[var(--cream)]/50">
               Then anything else you want. A voice memo, a video, more photos.
             </p>
-            <UploadZone token={contributor.inviteToken} />
+            <UploadZone
+              token={contributor.inviteToken}
+              onAllSettled={() => setUploadsKey((k) => k + 1)}
+            />
           </div>
+
+          <MyUploads
+            token={contributor.inviteToken}
+            refreshKey={uploadsKey}
+            onAvatarCleared={() => setAvatarUrl(null)}
+          />
         </div>
       )}
     </div>

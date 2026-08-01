@@ -51,6 +51,7 @@ export async function getWordOccurrences(normalized: string) {
       contributorId: contributors.id,
       contributorName: contributors.name,
       relationship: contributors.relationship,
+      avatarUrl: contributors.avatarUrl,
     })
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
@@ -74,70 +75,13 @@ export async function getPhraseOccurrences(text: string) {
       contributorId: contributors.id,
       contributorName: contributors.name,
       relationship: contributors.relationship,
+      avatarUrl: contributors.avatarUrl,
     })
     .from(phrases)
     .innerJoin(media, eq(phrases.mediaId, media.id))
     .innerJoin(contributors, eq(phrases.contributorId, contributors.id))
     .where(and(eq(phrases.text, text), eq(media.status, "ready")))
     .orderBy(contributors.name, phrases.startMs);
-}
-
-export async function getSnippetForWord(
-  text: string,
-  kind: "word" | "phrase" | "auto" = "auto",
-) {
-  const q = text.trim().toLowerCase();
-  if (!q) return null;
-
-  const playable = or(eq(media.kind, "video"), eq(media.kind, "audio"));
-  const lookPhrase = kind === "phrase" || (kind === "auto" && q.includes(" "));
-  const lookWord = kind === "word" || kind === "auto";
-
-  if (lookPhrase) {
-    const phraseRows = await db
-      .select({
-        blobUrl: media.blobUrl,
-        kind: media.kind,
-        startMs: phrases.startMs,
-        endMs: phrases.endMs,
-      })
-      .from(phrases)
-      .innerJoin(media, eq(phrases.mediaId, media.id))
-      .where(
-        and(eq(phrases.text, q), eq(media.status, "ready"), playable),
-      )
-      .limit(40);
-
-    if (phraseRows.length > 0) {
-      return phraseRows[Math.floor(Math.random() * phraseRows.length)];
-    }
-  }
-
-  if (lookWord) {
-    const wordRows = await db
-      .select({
-        blobUrl: media.blobUrl,
-        kind: media.kind,
-        startMs: words.startMs,
-        endMs: words.endMs,
-      })
-      .from(words)
-      .innerJoin(media, eq(words.mediaId, media.id))
-      .where(
-        and(
-          eq(words.normalized, q),
-          eq(media.status, "ready"),
-          playable,
-        ),
-      )
-      .limit(40);
-
-    if (wordRows.length > 0) {
-      return wordRows[Math.floor(Math.random() * wordRows.length)];
-    }
-  }
-
-  return null;
 }
 
 export async function getPeople() {
@@ -204,6 +148,7 @@ export async function getPhotos(contributorId?: string) {
       title: media.title,
       contributorId: contributors.id,
       contributorName: contributors.name,
+      avatarUrl: contributors.avatarUrl,
       createdAt: media.createdAt,
     })
     .from(media)

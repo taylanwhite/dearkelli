@@ -30,6 +30,7 @@ export default async function PeoplePage() {
                 relationship={person.relationship}
                 avatarUrl={person.avatarUrl}
                 size={i % 4 === 0 ? "lg" : "md"}
+                showRelationship
               />
             </li>
           ))}

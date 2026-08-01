@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PersonBubble } from "@/components/PersonBubble";
 import { playableUrl } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
@@ -29,37 +30,19 @@ export default async function PersonPage({ params }: Props) {
         ← Everyone
       </Link>
 
-      <header className="mt-8 flex flex-col items-start gap-6 sm:flex-row sm:items-center">
-        <span className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[var(--forest)] font-[family-name:var(--font-display)] text-3xl text-[var(--ground)] ring-2 ring-[var(--gold)]/30">
-          {person.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={playableUrl(person.avatarUrl)}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            person.name
-              .split(/\s+/)
-              .filter(Boolean)
-              .slice(0, 2)
-              .map((p) => p[0]?.toUpperCase() ?? "")
-              .join("")
-          )}
-        </span>
-        <div>
-          <h1 className="font-[family-name:var(--font-display)] text-4xl text-[var(--forest-deep)] sm:text-5xl">
-            {person.name}
-          </h1>
-          {person.relationship && (
-            <p className="mt-2 font-[family-name:var(--font-display)] text-lg text-[var(--gold-deep)]">
-              {person.relationship}
-            </p>
-          )}
-        </div>
+      <header className="mt-10 flex flex-col items-center text-center">
+        <PersonBubble
+          name={person.name}
+          relationship={person.relationship}
+          avatarUrl={person.avatarUrl}
+          size="xl"
+          href={null}
+          showRelationship
+        />
       </header>
+
       {softWords.length > 0 && (
-        <p className="mt-6 max-w-md font-[family-name:var(--font-display)] text-xl leading-relaxed text-[var(--forest)]/80">
+        <p className="mx-auto mt-8 max-w-md text-center font-[family-name:var(--font-display)] text-xl leading-relaxed text-[var(--forest)]/80">
           {softWords.map((w, i) => (
             <span key={w.normalized}>
               {i > 0 && <span className="text-[var(--gold)]/50"> · </span>}

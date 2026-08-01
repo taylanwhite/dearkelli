@@ -1,12 +1,8 @@
 "use client";
 
 import cloud from "d3-cloud";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  trackOrphanAudio,
-  untrackOrphanAudio,
-} from "@/lib/media-playback";
 
 export type CloudWord = {
   text: string;
@@ -55,16 +51,12 @@ function hitBox(word: LayoutWord) {
 }
 
 export function WordCloud({ words }: Props) {
-  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const coarseRef = useRef(false);
   const [size, setSize] = useState({ width: 360, height: 480 });
   const [laidOut, setLaidOut] = useState<LayoutWord[]>([]);
   const [ready, setReady] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [hint, setHint] = useState(false);
 
   const counts = useMemo(() => {
     const values = words.map((w) => w.count);
@@ -75,9 +67,6 @@ export function WordCloud({ words }: Props) {
   }, [words]);
 
   useEffect(() => {
-    coarseRef.current = window.matchMedia("(pointer: coarse)").matches;
-    if (coarseRef.current) setHint(true);
-
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReducedMotion(mq.matches);
     const onChange = () => setReducedMotion(mq.matches);
@@ -164,86 +153,6 @@ export function WordCloud({ words }: Props) {
     };
   }, [words, size.width, size.height, counts.min, counts.max]);
 
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        untrackOrphanAudio(audioRef.current);
-        audioRef.current.src = "";
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  function stopSnippet() {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      untrackOrphanAudio(audioRef.current);
-      audioRef.current.src = "";
-      audioRef.current = null;
-    }
-  }
-
-  async function playSnippet(word: CloudWord) {
-    try {
-      const type =
-        word.kind ?? (word.text.includes(" ") ? "phrase" : "word");
-      const res = await fetch(
-        `/api/snippet?word=${encodeURIComponent(word.text)}&type=${type}`,
-      );
-      if (!res.ok) return;
-      const data = (await res.json()) as {
-        blobUrl?: string;
-        startMs?: number;
-        endMs?: number;
-        snippet?: null;
-      };
-      if (!data.blobUrl || data.startMs == null || data.endMs == null) return;
-
-      stopSnippet();
-
-      const audio = new Audio(data.blobUrl);
-      audioRef.current = audio;
-      trackOrphanAudio(audio);
-      const start = Math.max(0, data.startMs / 1000 - 0.05);
-      const end = data.endMs / 1000 + 0.15;
-
-      audio.currentTime = start;
-      await audio.play();
-
-      const onTime = () => {
-        if (audio.currentTime >= end) {
-          audio.pause();
-          untrackOrphanAudio(audio);
-          audio.removeEventListener("timeupdate", onTime);
-        }
-      };
-      audio.addEventListener("timeupdate", onTime);
-    } catch {
-      // Snippet playback is optional atmosphere; ignore failures.
-    }
-  }
-
-  function activateWord(word: LayoutWord) {
-    setActive(word.text);
-    setHint(false);
-    void playSnippet(word);
-  }
-
-  function handleWordActivate(word: LayoutWord) {
-    if (coarseRef.current) {
-      // First tap: hear it. Second tap on the same word: open the supercut.
-      if (active === word.text) {
-        stopSnippet();
-        router.push(word.href);
-        return;
-      }
-      activateWord(word);
-      return;
-    }
-    router.push(word.href);
-  }
-
   if (words.length === 0) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6 text-center">
@@ -256,11 +165,6 @@ export function WordCloud({ words }: Props) {
 
   return (
     <div ref={containerRef} className="relative w-full overflow-hidden">
-      {hint && (
-        <p className="pointer-events-none absolute left-0 right-0 top-2 z-10 px-5 text-center text-sm text-[var(--muted)]">
-          Tap a word to hear it. Tap again to open it.
-        </p>
-      )}
       <svg
         width={size.width}
         height={size.height}
@@ -282,70 +186,55 @@ export function WordCloud({ words }: Props) {
             const box = hitBox(word);
 
             return (
-              <g
-                key={word.text}
-                role="link"
-                tabIndex={0}
-                aria-label={word.text}
-                onClick={() => handleWordActivate(word)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleWordActivate(word);
-                  }
-                }}
-                onMouseEnter={() => {
-                  if (coarseRef.current) return;
-                  setActive(word.text);
-                  void playSnippet(word);
-                }}
-                onMouseLeave={() => {
-                  if (coarseRef.current) return;
-                  setActive(null);
-                  stopSnippet();
-                }}
-                onFocus={() => setActive(word.text)}
-                style={{ cursor: "pointer" }}
-              >
-                <g
-                  style={{
-                    opacity: ready
-                      ? active && !isActive
-                        ? 0.35
-                        : 0.9
-                      : 0,
-                    transform: ready
-                      ? `translate(${word.x}px, ${word.y}px) scale(${
-                          isActive ? 1.06 : 1
-                        })`
-                      : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
-                    transition: reducedMotion
-                      ? "opacity 0.6s ease"
-                      : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
-                  }}
+              <g key={word.text}>
+                <Link
+                  href={word.href}
+                  onMouseEnter={() => setActive(word.text)}
+                  onMouseLeave={() => setActive(null)}
+                  onFocus={() => setActive(word.text)}
+                  onBlur={() => setActive(null)}
                 >
-                  <rect
-                    x={-box.width / 2}
-                    y={-box.height / 2}
-                    width={box.width}
-                    height={box.height}
-                    fill="transparent"
-                  />
-                  <text
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fill={wordFill(index, isActive)}
-                    fontFamily="var(--font-display), Georgia, serif"
-                    fontSize={word.size}
-                    fontWeight={word.weight}
+                  <g
                     style={{
-                      transition: "fill 0.2s ease",
-                      pointerEvents: "none",
+                      opacity: ready
+                        ? active && !isActive
+                          ? 0.35
+                          : 0.9
+                        : 0,
+                      transform: ready
+                        ? `translate(${word.x}px, ${word.y}px) scale(${
+                            isActive ? 1.06 : 1
+                          })`
+                        : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
+                      transition: reducedMotion
+                        ? "opacity 0.6s ease"
+                        : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
                     }}
                   >
-                    {word.text}
-                  </text>
-                </g>
+                    <rect
+                      x={-box.width / 2}
+                      y={-box.height / 2}
+                      width={box.width}
+                      height={box.height}
+                      fill="transparent"
+                    />
+                    <text
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fill={wordFill(index, isActive)}
+                      fontFamily="var(--font-display), Georgia, serif"
+                      fontSize={word.size}
+                      fontWeight={word.weight}
+                      style={{
+                        cursor: "pointer",
+                        transition: "fill 0.2s ease",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      {word.text}
+                    </text>
+                  </g>
+                </Link>
               </g>
             );
           })}
