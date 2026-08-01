@@ -30,7 +30,7 @@ export function TrackedAvPlayer({
           disableRemotePlayback
           playsInline
           className="aspect-video w-full rounded-2xl bg-[var(--forest-deep)] object-contain"
-          preload="metadata"
+          preload="none"
           onPlay={() => recordMediaView(id)}
         />
       ) : (
@@ -39,6 +39,7 @@ export function TrackedAvPlayer({
             src={src}
             controls
             controlsList="nodownload noplaybackrate"
+            preload="none"
             className="w-full"
             onPlay={() => recordMediaView(id)}
           />

@@ -48,6 +48,8 @@ export const media = pgTable(
     posterUrl: text("poster_url"),
     /** Smaller H.264/AAC MP4 for smooth playback. After encode, blobUrl usually points here too and the original is deleted. */
     playbackUrl: text("playback_url"),
+    /** Higher-quality 1080p H.264/AAC MP4 for Kelli's full-clip viewing. Cloud/previews use the smaller playbackUrl. */
+    playbackHqUrl: text("playback_hq_url"),
     status: mediaStatusEnum("status").notNull().default("uploaded"),
     title: text("title"),
     summary: text("summary"),

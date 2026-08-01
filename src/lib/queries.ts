@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   contributors,
@@ -19,7 +19,13 @@ export async function getWordStats() {
     })
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
-    .where(and(eq(media.status, "ready"), eq(words.source, "speech")))
+    .where(
+      and(
+        eq(media.status, "ready"),
+        // Spoken words + warm AI tags both belong on the cloud.
+        inArray(words.source, ["speech", "tag"]),
+      ),
+    )
     .groupBy(words.normalized)
     .orderBy(desc(sql`count(*)`));
 
@@ -44,8 +50,10 @@ export async function getWordOccurrences(normalized: string) {
     .select({
       wordId: words.id,
       raw: words.raw,
+      source: words.source,
       startMs: words.startMs,
       endMs: words.endMs,
+      durationSeconds: media.durationSeconds,
       mediaId: media.id,
       blobUrl: media.blobUrl,
       kind: media.kind,
@@ -64,7 +72,7 @@ export async function getWordOccurrences(normalized: string) {
       and(
         eq(words.normalized, normalized),
         eq(media.status, "ready"),
-        eq(words.source, "speech"),
+        inArray(words.source, ["speech", "tag"]),
       ),
     )
     .orderBy(contributors.name, words.startMs);
@@ -140,7 +148,7 @@ export async function getPerson(id: string) {
   const topWordConditions = [
     eq(words.contributorId, id),
     eq(media.status, "ready"),
-    eq(words.source, "speech"),
+    inArray(words.source, ["speech", "tag"]),
     isNull(media.processingError),
   ];
   if (person.avatarUrl) {
@@ -217,7 +225,7 @@ export async function searchAll(query: string) {
         .where(
           and(
             eq(media.status, "ready"),
-            eq(words.source, "speech"),
+            inArray(words.source, ["speech", "tag"]),
             or(ilike(words.normalized, pattern), ilike(words.raw, pattern)),
           ),
         )

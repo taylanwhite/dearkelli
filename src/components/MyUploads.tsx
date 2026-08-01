@@ -226,9 +226,9 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                 <div className="px-3 pb-3 pt-2">
                   <audio
                     src={item.previewUrl}
+                    preload="none"
                     controls
                     controlsList="nodownload noplaybackrate"
-                    preload="metadata"
                     className="w-full"
                   />
                 </div>
@@ -265,7 +265,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                     className="h-full w-full object-cover"
                     muted
                     playsInline
-                    preload="metadata"
+                    preload="none"
                     controls
                     controlsList="nodownload noplaybackrate"
                     disablePictureInPicture

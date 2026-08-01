@@ -1,4 +1,4 @@
-import { get } from "@vercel/blob";
+import { get, issueSignedToken, presignUrl } from "@vercel/blob";
 import { and, eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
@@ -7,6 +7,40 @@ import { isAdminAuthenticated, isAuthenticated } from "@/lib/auth";
 import { BLOB_ACCESS } from "@/lib/blob";
 
 export const runtime = "nodejs";
+
+/** How long a signed playback URL stays valid. Long enough to watch, short
+ * enough that a shared/leaked URL expires quickly. */
+const SIGNED_URL_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Mint a short-lived signed URL the Blob CDN serves directly to the browser.
+ * This keeps media bytes off our serverless function (no double-counted Data
+ * Transfer, no function runtime per byte) and lets the CDN cache re-watches.
+ * Returns null if signing isn't possible so the caller can fall back to
+ * proxy-streaming.
+ */
+async function signedBlobUrl(blobUrl: string): Promise<string | null> {
+  try {
+    const pathname = new URL(blobUrl).pathname.replace(/^\/+/, "");
+    if (!pathname) return null;
+    const validUntil = Date.now() + SIGNED_URL_TTL_MS;
+    const token = await issueSignedToken({
+      pathname,
+      operations: ["get"],
+      validUntil,
+    });
+    const { presignedUrl } = await presignUrl(token, {
+      operation: "get",
+      pathname,
+      access: BLOB_ACCESS,
+      validUntil,
+    });
+    return presignedUrl;
+  } catch (err) {
+    console.warn("presign failed; falling back to proxy stream", err);
+    return null;
+  }
+}
 
 async function contributorCanAccessBlob(
   inviteToken: string,
@@ -84,6 +118,19 @@ export async function GET(request: Request) {
     }
   }
 
+  // Preferred path: hand the browser a short-lived signed URL and let it pull
+  // bytes straight from the Blob CDN. Media never flows through this function,
+  // so it doesn't burn Fast Data Transfer, and the CDN caches re-watches.
+  const signed = await signedBlobUrl(url);
+  if (signed) {
+    return NextResponse.redirect(signed, {
+      status: 307,
+      // The target self-expires, so don't let the redirect itself be cached.
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
+
+  // Fallback: proxy-stream through the function (used only if signing fails).
   // Processed assets (poster/thumb/full/playback) are immutable per URL, so
   // let browsers keep them for a month. This is the biggest lever on repeat
   // Blob Data Transfer cost: a re-watch/re-view is served from cache for free.

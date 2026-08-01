@@ -57,7 +57,9 @@ export default async function PersonPage({ params }: Props) {
               ? playableUrl(clip.posterUrl || clip.blobUrl)
               : playbackSrc({
                   blobUrl: clip.blobUrl,
-                  playbackUrl: clip.playbackUrl,
+                  // Kelli watches full clips here — prefer the 1080p rendition,
+                  // falling back to the 720p web file, then the original.
+                  playbackUrl: clip.playbackHqUrl || clip.playbackUrl,
                 }),
           poster: clip.posterUrl ? playableUrl(clip.posterUrl) : undefined,
           title: clip.title,

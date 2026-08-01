@@ -14,7 +14,8 @@
     "seed": "tsx scripts/seed.ts",
     "seed:test": "tsx scripts/seed-test.ts",
     "seed:test:clean": "tsx scripts/clean-test.ts",
-    "process": "tsx scripts/process-media.ts"
+    "process": "tsx scripts/process-media.ts",
+    "reencode": "tsx scripts/reencode-videos.ts"
   },
   "dependencies": {
     "@ffmpeg-installer/ffmpeg": "^1.1.0",

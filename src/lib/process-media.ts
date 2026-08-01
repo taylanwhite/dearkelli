@@ -38,6 +38,68 @@ function getOpenAI() {
   return new OpenAI({ apiKey: key });
 }
 
+/**
+ * Second-pass sanity check on the warm AI tags before they go onto Kelli's word
+ * cloud. Given what this specific memory is actually about, the model drops any
+ * candidate word that feels off-tone or unrelated (e.g. "laughter" on a somber
+ * clip, or a generic filler word that doesn't reflect this moment). Allowlisted
+ * warmth alone isn't enough — the word also has to *fit the memory*.
+ *
+ * Soft-fails to the input list if the model errors, so we never lose tags to a
+ * transient API problem.
+ */
+async function curateThemeFitTags(
+  openai: OpenAI,
+  candidates: string[],
+  context: string,
+): Promise<string[]> {
+  const unique = Array.from(new Set(candidates)).filter(Boolean);
+  if (unique.length <= 1) return unique;
+
+  const memory = context.trim().slice(0, 1500) || "(no description available)";
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `You curate words for a loving keepsake word cloud made for a woman named Kelli.
+You are given what one memory (a photo or video) is actually about, plus a list of candidate words.
+Keep only the words that BOTH feel warm/tender/uplifting AND genuinely fit this specific memory.
+Drop anything off-tone, clinical, sad, or that doesn't reflect what this memory is about — even if the word itself is nice.
+It is better to return fewer, truer words than to keep a generic word that doesn't fit.
+Only use words from the candidate list; never invent new ones.
+Return JSON: { "keep": string[] }`,
+        },
+        {
+          role: "user",
+          content: `Memory:\n${memory}\n\nCandidate words: ${unique.join(", ")}`,
+        },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content ?? "{}";
+    const parsed = JSON.parse(raw) as { keep?: unknown };
+    if (!Array.isArray(parsed.keep)) return unique;
+
+    const allowed = new Set(unique.map((w) => w.toLowerCase()));
+    const kept = parsed.keep
+      .filter((w): w is string => typeof w === "string")
+      .map((w) => w.toLowerCase().trim())
+      .filter((w) => allowed.has(w));
+
+    // If the model returns nothing usable, fall back to the candidates rather
+    // than silently emptying the cloud for this memory.
+    return kept.length ? Array.from(new Set(kept)) : unique;
+  } catch (err) {
+    console.warn("Tag theme-fit curation failed; keeping candidates", err);
+    return unique;
+  }
+}
+
 async function downloadBlobToFile(url: string, dest: string) {
   const result = await get(url, { access: BLOB_ACCESS });
   if (!result || result.statusCode !== 200 || !result.stream) {
@@ -286,37 +348,74 @@ async function extractAudioForWhisper(
   throw lastError || new Error("Audio extract failed");
 }
 
+type PlaybackProfile = {
+  /** Bounding box (longest/shortest side) the video is scaled to fit inside. */
+  boxW: number;
+  boxH: number;
+  crf: number;
+  maxrate: string;
+  bufsize: string;
+  audioBitrate: string;
+};
+
+/**
+ * Small, cheap-to-serve rendition for the word cloud, previews, and thumbnails.
+ * Hard 720p cap in either orientation so portrait phone clips shrink too.
+ */
+const PLAYBACK_720: PlaybackProfile = {
+  boxW: 1280,
+  boxH: 720,
+  crf: 30,
+  maxrate: "1200k",
+  bufsize: "2400k",
+  audioBitrate: "96k",
+};
+
+/**
+ * Higher-quality 1080p rendition for Kelli's full-clip viewing. She's the only
+ * one who watches this, so the larger size is worth it for her.
+ */
+const PLAYBACK_1080: PlaybackProfile = {
+  boxW: 1920,
+  boxH: 1080,
+  crf: 24,
+  maxrate: "4000k",
+  bufsize: "8000k",
+  audioBitrate: "128k",
+};
+
 function createWebPlayback(
   ffmpeg: typeof import("fluent-ffmpeg"),
   inputPath: string,
   outputPath: string,
+  profile: PlaybackProfile = PLAYBACK_720,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
       .outputOptions([
         "-hide_banner",
         "-nostdin",
-        // Compact, web-friendly H.264 + AAC with moov at the front.
-        // Tuned for low data-transfer cost: ~720p cap, CRF 30, and a hard
-        // bitrate ceiling so high-motion phone footage can't balloon.
+        // Web-friendly H.264 + AAC with moov at the front. The video is scaled
+        // to fit inside boxW x boxH in either orientation, with a bitrate
+        // ceiling so high-motion footage can't balloon.
         "-c:v",
         "libx264",
         "-preset",
         "veryfast",
         "-crf",
-        "30",
+        String(profile.crf),
         "-maxrate",
-        "1600k",
+        profile.maxrate,
         "-bufsize",
-        "3200k",
+        profile.bufsize,
         "-pix_fmt",
         "yuv420p",
         "-vf",
-        "scale='min(1280,iw)':-2",
+        `scale=${profile.boxW}:${profile.boxH}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
         "-c:a",
         "aac",
         "-b:a",
-        "96k",
+        profile.audioBitrate,
         "-ac",
         "2",
         "-movflags",
@@ -356,7 +455,10 @@ function getDurationSeconds(
   return new Promise((resolve) => {
     ffmpeg.ffprobe(inputPath, (err, data) => {
       if (err) return resolve(null);
-      resolve(data.format.duration ?? null);
+      // Some containers (e.g. webm voice notes) report a non-numeric duration;
+      // never let NaN reach the integer column.
+      const d = data.format.duration;
+      resolve(typeof d === "number" && Number.isFinite(d) ? d : null);
     });
   });
 }
@@ -639,8 +741,16 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
 
   const enrichment = await enrichImage(openai, oriented);
   const priorTags = item.tags || [];
-  const tags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
+  const warmTags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
   const themes = (enrichment.themes || []).slice(0, 3);
+  // Warm words still have to fit *this* photo before they reach the cloud.
+  const themeContext = [
+    item.summary || enrichment.caption || enrichment.title,
+    themes.length ? `Themes: ${themes.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const tags = await curateThemeFitTags(openai, warmTags, themeContext);
 
   await db.delete(words).where(eq(words.mediaId, item.id));
   await db.delete(phrases).where(eq(phrases.mediaId, item.id));
@@ -703,9 +813,11 @@ async function markVisibleWithoutAi(
     duration?: number | null;
     posterUrl?: string | null;
     playbackUrl?: string | null;
+    playbackHqUrl?: string | null;
   },
 ) {
   const playbackUrl = opts.playbackUrl ?? item.playbackUrl;
+  const playbackHqUrl = opts.playbackHqUrl ?? item.playbackHqUrl;
   // Prefer the compressed web file as the canonical blob once we have it.
   const blobUrl =
     item.kind === "video" && playbackUrl && playbackUrl !== item.blobUrl
@@ -717,11 +829,13 @@ async function markVisibleWithoutAi(
     .set({
       status: "ready",
       processingError: opts.error.slice(0, 1000),
-      durationSeconds: opts.duration
-        ? Math.round(opts.duration)
-        : item.durationSeconds,
+      durationSeconds:
+        typeof opts.duration === "number" && Number.isFinite(opts.duration)
+          ? Math.round(opts.duration)
+          : item.durationSeconds,
       posterUrl: opts.posterUrl ?? item.posterUrl,
       playbackUrl,
+      playbackHqUrl,
       blobUrl,
       title:
         item.title ||
@@ -755,6 +869,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
   let duration: number | null = item.durationSeconds;
   let posterUrl = item.posterUrl;
   let playbackUrl = item.playbackUrl;
+  let playbackHqUrl = item.playbackHqUrl;
   let ffmpegAvailable = true;
   let ffmpeg: typeof import("fluent-ffmpeg") | null = null;
 
@@ -795,10 +910,10 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         console.warn("Poster extraction failed", err);
       }
 
-      // Build a smaller fast-start MP4 so the site doesn't stream a huge MOV.
+      // Small 720p rendition for the word cloud, previews, and thumbnails.
       try {
         const playbackPath = join(workDir, "playback.mp4");
-        await createWebPlayback(ffmpeg, sourcePath, playbackPath);
+        await createWebPlayback(ffmpeg, sourcePath, playbackPath, PLAYBACK_720);
         const playbackBuf = await readFile(playbackPath);
         const playbackBlob = await put(
           `processed/${item.id}/playback.mp4`,
@@ -808,6 +923,21 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         playbackUrl = playbackBlob.url;
       } catch (err) {
         console.warn("Web playback encode failed", err);
+      }
+
+      // Higher-quality 1080p rendition for Kelli's full-clip viewing.
+      try {
+        const hqPath = join(workDir, "playback-hq.mp4");
+        await createWebPlayback(ffmpeg, sourcePath, hqPath, PLAYBACK_1080);
+        const hqBuf = await readFile(hqPath);
+        const hqBlob = await put(
+          `processed/${item.id}/playback-hq.mp4`,
+          hqBuf,
+          { ...PROCESSED_PUT, contentType: "video/mp4" },
+        );
+        playbackHqUrl = hqBlob.url;
+      } catch (err) {
+        console.warn("HQ playback encode failed", err);
       }
     }
 
@@ -833,6 +963,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
           duration,
           posterUrl,
           playbackUrl,
+          playbackHqUrl,
         });
         return;
       }
@@ -844,6 +975,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       duration,
       posterUrl,
       playbackUrl,
+      playbackHqUrl,
     });
     return;
   }
@@ -864,6 +996,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       duration,
       posterUrl,
       playbackUrl,
+      playbackHqUrl,
     });
     return;
   }
@@ -915,8 +1048,16 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
   }
 
   const priorTags = item.tags || [];
-  const tags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
+  const warmTags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
   const themes = (enrichment.themes || []).slice(0, 3);
+  // Warm words still have to fit *this* clip before they reach the cloud.
+  const themeContext = [
+    transcript.text?.trim() || enrichment.summary || enrichment.title,
+    themes.length ? `Themes: ${themes.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const tags = await curateThemeFitTags(openai, warmTags, themeContext);
   const aiTagWords = tagWordsFromList(tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
@@ -991,9 +1132,13 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     .set({
       status: "ready",
       processingError: null,
-      durationSeconds: duration ? Math.round(duration) : item.durationSeconds,
+      durationSeconds:
+        typeof duration === "number" && Number.isFinite(duration)
+          ? Math.round(duration)
+          : item.durationSeconds,
       posterUrl,
       playbackUrl,
+      playbackHqUrl,
       blobUrl,
       // Leave summary/title alone — contributor notes only (audio has none).
       themes,
