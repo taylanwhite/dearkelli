@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+:root {
+  --ground: #151021;
+  --surface: #231a33;
+  --gold: #e8b14c;
+  --blush: #e4899b;
+  --cream: #f6f0e8;
+  --background: var(--ground);
+  --foreground: var(--cream);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-gold: var(--gold);
+  --color-blush: var(--blush);
+  --color-cream: var(--cream);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--ground);
+  color: var(--cream);
+  font-family: var(--font-body), system-ui, sans-serif;
+  min-height: 100dvh;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--gold) 45%, transparent);
+  color: var(--cream);
+}
+
+a {
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
