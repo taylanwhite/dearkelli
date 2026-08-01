@@ -3,10 +3,6 @@
 import cloud from "d3-cloud";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  LightboxOverlay,
-  type LightboxPhoto,
-} from "@/components/LightboxOverlay";
 import { playableUrl } from "@/lib/blob";
 
 export type CloudWord = {
@@ -95,9 +91,6 @@ export function WordCloud({ words, people = [] }: Props) {
   const [active, setActive] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [orderSeed] = useState(() => Math.random());
-  const [faceLightbox, setFaceLightbox] = useState<LightboxPhoto[] | null>(
-    null,
-  );
 
   const counts = useMemo(() => {
     const values = words.map((w) => w.count);
@@ -284,42 +277,13 @@ export function WordCloud({ words, people = [] }: Props) {
             return (
               <g key={item.key}>
                 {item.type === "person" ? (
-                  <g
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Enlarge photo of ${item.name || item.text}`}
-                    onClick={() => {
-                      const src = item.avatarUrl
-                        ? playableUrl(item.avatarUrl)
-                        : null;
-                      if (!src) {
-                        window.location.href = item.href;
-                        return;
-                      }
-                      setFaceLightbox([
-                        {
-                          id: item.key,
-                          src,
-                          alt: item.name || item.text,
-                          caption: item.name,
-                          footerHref: item.href,
-                          footerLabel: `See ${item.name}`,
-                        },
-                      ]);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        (e.currentTarget as SVGElement).dispatchEvent(
-                          new MouseEvent("click", { bubbles: true }),
-                        );
-                      }
-                    }}
+                  <Link
+                    href={item.href}
+                    aria-label={`See ${item.name || item.text}`}
                     onMouseEnter={() => setActive(item.key)}
                     onMouseLeave={() => setActive(null)}
                     onFocus={() => setActive(item.key)}
                     onBlur={() => setActive(null)}
-                    style={{ cursor: "pointer" }}
                   >
                     <g
                       style={{
@@ -379,7 +343,7 @@ export function WordCloud({ words, people = [] }: Props) {
                         )}
                       </g>
                     </g>
-                  </g>
+                  </Link>
                 ) : (
                   <Link
                     href={item.href}
@@ -435,12 +399,6 @@ export function WordCloud({ words, people = [] }: Props) {
           })}
         </g>
       </svg>
-      <LightboxOverlay
-        photos={faceLightbox || []}
-        index={faceLightbox ? 0 : null}
-        onClose={() => setFaceLightbox(null)}
-        onChangeIndex={() => {}}
-      />
     </div>
   );
 }

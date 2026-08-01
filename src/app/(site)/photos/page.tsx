@@ -20,7 +20,7 @@ export default async function PhotosPage({ searchParams }: Props) {
         {fromPerson ? `From ${fromPerson.name}` : "Pictures they sent you"}
       </h1>
 
-      <div className="-mx-5 mt-8 flex gap-4 overflow-x-auto px-5 pb-3">
+      <div className="-mx-5 mt-8 flex gap-4 overflow-x-auto px-5 pt-2 pb-3">
         <Link
           href="/photos"
           className="group flex w-[4.5rem] shrink-0 flex-col items-center text-center touch-manipulation"

@@ -24,7 +24,10 @@ type Props = {
   layout?: "stack" | "row";
   onClick?: () => void;
   className?: string;
-  /** When false, avatar won't open a lightbox (e.g. when the whole chip must be one tap target). */
+  /**
+   * Enlarge the photo in a lightbox. Only applies when this bubble is not a
+   * link or selection chip (e.g. on someone's profile page).
+   */
   enlargeAvatar?: boolean;
 };
 
@@ -78,18 +81,21 @@ export function PersonBubble({
   const stacked = layout === "stack";
   const [open, setOpen] = useState(false);
 
-  const photo: LightboxPhoto | null = src
-    ? {
-        id: id || src,
-        src,
-        alt: name,
-        caption: name,
-        footerHref: destination,
-        footerLabel: destination ? `See ${name}` : null,
-      }
-    : null;
+  // Links and selection chips navigate/select; enlarge only on static faces
+  // (profile header).
+  const canEnlarge = Boolean(
+    enlargeAvatar && src && !destination && !onClick,
+  );
 
-  const canEnlarge = Boolean(enlargeAvatar && src);
+  const photo: LightboxPhoto | null =
+    canEnlarge && src
+      ? {
+          id: id || src,
+          src,
+          alt: name,
+          caption: name,
+        }
+      : null;
 
   const avatarRing = `relative flex shrink-0 ${AVATAR[size]} items-center justify-center overflow-hidden rounded-full bg-[var(--sage)] font-[family-name:var(--font-display)] text-[var(--ground)] shadow-[0_6px_18px_rgba(58,53,50,0.1)] transition ${
     selected
@@ -127,59 +133,14 @@ export function PersonBubble({
     ? `group flex ${STACK_WIDTH[size]} flex-col items-center touch-manipulation ${className}`
     : `group flex items-center gap-2.5 touch-manipulation ${className}`;
 
-  const lightbox = photo ? (
-    <LightboxOverlay
-      photos={[photo]}
-      index={open ? 0 : null}
-      onClose={() => setOpen(false)}
-      onChangeIndex={() => {}}
-    />
-  ) : null;
-
-  const enlargeButton = (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      className={avatarRing}
-      aria-label={`Enlarge photo of ${name}`}
-    >
-      {avatarInner}
-    </button>
-  );
-
   const staticAvatar = <span className={avatarRing}>{avatarInner}</span>;
 
-  // Selection chips (e.g. supercut): photo enlarges; name runs onClick.
   if (onClick) {
     return (
-      <>
-        <div className={shell}>
-          {canEnlarge ? enlargeButton : staticAvatar}
-          <button type="button" onClick={onClick} className="min-w-0">
-            {nameBlock}
-          </button>
-        </div>
-        {lightbox}
-      </>
-    );
-  }
-
-  // Linked people: photo enlarges; name navigates.
-  if (canEnlarge) {
-    return (
-      <>
-        <div className={shell}>
-          {enlargeButton}
-          {destination ? (
-            <Link href={destination} className="min-w-0">
-              {nameBlock}
-            </Link>
-          ) : (
-            nameBlock
-          )}
-        </div>
-        {lightbox}
-      </>
+      <button type="button" onClick={onClick} className={shell}>
+        {staticAvatar}
+        {nameBlock}
+      </button>
     );
   }
 
@@ -189,6 +150,32 @@ export function PersonBubble({
         {staticAvatar}
         {nameBlock}
       </Link>
+    );
+  }
+
+  if (canEnlarge) {
+    return (
+      <>
+        <div className={shell}>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className={avatarRing}
+            aria-label={`Enlarge photo of ${name}`}
+          >
+            {avatarInner}
+          </button>
+          {nameBlock}
+        </div>
+        {photo ? (
+          <LightboxOverlay
+            photos={[photo]}
+            index={open ? 0 : null}
+            onClose={() => setOpen(false)}
+            onChangeIndex={() => {}}
+          />
+        ) : null}
+      </>
     );
   }
 
