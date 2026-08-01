@@ -2,6 +2,11 @@
 
 import { upload } from "@vercel/blob/client";
 import { useCallback, useRef, useState } from "react";
+import {
+  MAX_UPLOAD_LABEL,
+  isOverUploadLimit,
+  uploadLimitMessage,
+} from "@/lib/media";
 
 type FileStatus = "queued" | "uploading" | "done" | "error";
 
@@ -25,9 +30,9 @@ function kindFromFile(file: File): MediaKind {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
   const name = file.name.toLowerCase();
-  if (/\.(heic|heif|jpe?g|png|gif|webp)$/.test(name)) return "image";
-  if (/\.(mp4|mov|m4v|webm)$/.test(name)) return "video";
-  if (/\.(m4a|mp3|wav|aac|ogg|caf)$/.test(name)) return "audio";
+  if (/\.(heic|heif|jpe?g|png|gif|webp|bmp|tiff?)$/.test(name)) return "image";
+  if (/\.(mp4|mov|m4v|webm|3gp|avi)$/.test(name)) return "video";
+  if (/\.(m4a|mp3|wav|aac|ogg|caf|flac|amr)$/.test(name)) return "audio";
   return "other";
 }
 
@@ -199,17 +204,24 @@ export function UploadZone({ token, onAllSettled }: Props) {
       const list = Array.from(incoming);
       if (list.length === 0) return;
 
-      const tracked: TrackedFile[] = list.map((file) => ({
-        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
-        file,
-        progress: 0,
-        status: "queued",
-      }));
+      const tracked: TrackedFile[] = list.map((file) => {
+        const over = isOverUploadLimit(file.size);
+        return {
+          id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+          file,
+          progress: over ? 100 : 0,
+          status: over ? ("error" as const) : ("queued" as const),
+          error: over ? uploadLimitMessage(file.name) : undefined,
+        };
+      });
 
       setFiles((prev) => [...prev, ...tracked]);
 
+      const toUpload = tracked.filter((item) => item.status === "queued");
+      if (toUpload.length === 0) return;
+
       void (async () => {
-        for (const item of tracked) {
+        for (const item of toUpload) {
           await uploadOne(item);
         }
         onAllSettled?.();
@@ -224,6 +236,7 @@ export function UploadZone({ token, onAllSettled }: Props) {
     files.every((f) => f.status === "done" || f.status === "error");
   const anyDone = doneFiles.length > 0;
   const thanks = anyDone ? thankYouCopy(doneFiles) : null;
+  const rejectedOnly = allDone && !anyDone;
 
   return (
     <div className="space-y-6">
@@ -279,12 +292,12 @@ export function UploadZone({ token, onAllSettled }: Props) {
             Drop a video, voice memo, or photo
           </p>
           <p className="mt-2 text-sm text-[var(--cream)]/55">
-            Or tap to choose from your phone
+            Or tap to choose from your phone. Up to {MAX_UPLOAD_LABEL} each.
           </p>
           <input
             ref={inputRef}
             type="file"
-            accept="video/*,audio/*,image/*,.heic,.heif"
+            accept="video/*,audio/*,image/*,.heic,.heif,.mov,.m4a,.mp3,.mp4,.caf"
             multiple
             className="hidden"
             onChange={(e) => {
@@ -295,7 +308,7 @@ export function UploadZone({ token, onAllSettled }: Props) {
         </div>
       )}
 
-      {files.length > 0 && !allDone && (
+      {(files.length > 0 && !allDone) || rejectedOnly ? (
         <ul className="space-y-3">
           {files.map((f) => (
             <li
@@ -340,7 +353,7 @@ export function UploadZone({ token, onAllSettled }: Props) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
       {uploading && (
         <p className="text-center text-sm text-[var(--cream)]/45">

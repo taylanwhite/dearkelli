@@ -1,13 +1,14 @@
 import { WordCloud } from "@/components/WordCloud";
-import { getPhraseStats, getWordStats } from "@/lib/queries";
+import { getPeople, getPhraseStats, getWordStats } from "@/lib/queries";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [wordStats, phraseStats] = await Promise.all([
+  const [wordStats, phraseStats, people] = await Promise.all([
     getWordStats(),
     getPhraseStats(),
+    getPeople(),
   ]);
 
   const cloudWords = [
@@ -36,9 +37,17 @@ export default async function HomePage() {
     return true;
   });
 
+  const faces = people.map((p) => ({
+    type: "person" as const,
+    id: p.id,
+    name: p.name,
+    avatarUrl: p.avatarUrl,
+    href: `/people/${p.id}`,
+  }));
+
   return (
     <main className="pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-4">
-      <WordCloud words={unique} />
+      <WordCloud words={unique} people={faces} />
     </main>
   );
 }

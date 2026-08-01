@@ -75,7 +75,6 @@ export function SendForm({ contributor, isGeneric }: Props) {
         </p>
         <p className="mt-4 text-sm leading-relaxed text-[var(--cream)]/45">
           Feel free to come back and add more for Kelli throughout the years.
-          Things she&apos;d like to see. Save this link.
         </p>
       </header>
 

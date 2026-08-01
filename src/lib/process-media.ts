@@ -17,6 +17,7 @@ import {
   type Media,
 } from "@/db/schema";
 import { BLOB_ACCESS } from "@/lib/blob";
+import { isHeicLike } from "@/lib/media";
 import {
   THEME_TAGS,
   detectPhrases,
@@ -260,9 +261,11 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
   await downloadBlobToFile(item.blobUrl, sourcePath);
   let buffer = await readFile(sourcePath);
 
-  const isHeic =
-    item.originalFilename?.toLowerCase().match(/\.heic|\.heif$/) ||
-    item.blobUrl.toLowerCase().includes(".heic");
+  const isHeic = isHeicLike(
+    item.originalFilename,
+    item.blobUrl,
+    null,
+  );
 
   if (isHeic) {
     const convertHeic = (await import("heic-convert")).default;

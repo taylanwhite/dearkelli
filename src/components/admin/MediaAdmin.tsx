@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { EnlargeableImage } from "@/components/EnlargeableImage";
 
 export type AdminMediaItem = {
   id: string;
@@ -113,6 +114,27 @@ export function MediaAdmin({ initialMedia }: Props) {
                 key={item.id}
                 className="rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] p-4"
               >
+                <div className="flex gap-4">
+                  {item.kind === "image" && (
+                    <EnlargeableImage
+                      src={`/api/media/stream?url=${encodeURIComponent(item.posterUrl || item.blobUrl)}`}
+                      alt={item.title || item.originalFilename || "Photo"}
+                      className="h-20 w-20 shrink-0"
+                      imgClassName="h-20 w-20 object-cover"
+                      rounded="rounded-xl"
+                      caption={item.title || item.caption}
+                      gallery={[
+                        {
+                          id: item.id,
+                          src: `/api/media/stream?url=${encodeURIComponent(item.blobUrl)}`,
+                          alt: item.title || item.originalFilename || "Photo",
+                          caption: item.summary || item.caption || item.title,
+                          contributorName: item.contributorName,
+                        },
+                      ]}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
                     {item.kind}
@@ -209,6 +231,8 @@ export function MediaAdmin({ initialMedia }: Props) {
                   >
                     Delete
                   </button>
+                </div>
+                  </div>
                 </div>
               </li>
             );

@@ -3,25 +3,49 @@
 import cloud from "d3-cloud";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  LightboxOverlay,
+  type LightboxPhoto,
+} from "@/components/LightboxOverlay";
+import { playableUrl } from "@/lib/blob";
 
 export type CloudWord = {
+  type?: "word";
   text: string;
   count: number;
   href: string;
   kind?: "word" | "phrase";
 };
 
-type LayoutWord = CloudWord & {
+export type CloudPerson = {
+  type: "person";
+  id: string;
+  name: string;
+  avatarUrl: string | null;
+  href: string;
+};
+
+export type CloudItem = CloudWord | CloudPerson;
+
+type LayoutItem = {
+  key: string;
+  type: "word" | "person";
+  text: string;
+  href: string;
   x: number;
   y: number;
   size: number;
-  rotate: number;
   weight: number;
+  avatarUrl?: string | null;
+  name?: string;
 };
 
 type Props = {
   words: CloudWord[];
+  people?: CloudPerson[];
 };
+
+const FACE_SIZE = 52;
 
 function weightForCount(count: number, min: number, max: number) {
   if (max === min) return 600;
@@ -44,19 +68,36 @@ function wordFill(index: number, active: boolean) {
   return "var(--ink)";
 }
 
-function hitBox(word: LayoutWord) {
-  const height = Math.max(44, word.size * 1.55);
-  const width = Math.max(48, word.text.length * word.size * 0.58);
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
+function hitBox(item: LayoutItem) {
+  if (item.type === "person") {
+    const s = FACE_SIZE + 8;
+    return { width: s, height: s };
+  }
+  const height = Math.max(44, item.size * 1.55);
+  const width = Math.max(48, item.text.length * item.size * 0.58);
   return { width, height };
 }
 
-export function WordCloud({ words }: Props) {
+export function WordCloud({ words, people = [] }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 360, height: 480 });
-  const [laidOut, setLaidOut] = useState<LayoutWord[]>([]);
+  const [laidOut, setLaidOut] = useState<LayoutItem[]>([]);
   const [ready, setReady] = useState(false);
   const [active, setActive] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [orderSeed] = useState(() => Math.random());
+  const [faceLightbox, setFaceLightbox] = useState<LightboxPhoto[] | null>(
+    null,
+  );
 
   const counts = useMemo(() => {
     const values = words.map((w) => w.count);
@@ -97,7 +138,7 @@ export function WordCloud({ words }: Props) {
   }, []);
 
   useEffect(() => {
-    if (words.length === 0) {
+    if (words.length === 0 && people.length === 0) {
       setLaidOut([]);
       setReady(true);
       return;
@@ -106,13 +147,57 @@ export function WordCloud({ words }: Props) {
     let cancelled = false;
     setReady(false);
 
-    const input = words.map((w) => ({
-      ...w,
+    type CloudInput = {
+      key: string;
+      type: "word" | "person";
+      text: string;
+      href: string;
+      size: number;
+      weight: number;
+      avatarUrl?: string | null;
+      name?: string;
+      count?: number;
+      kind?: "word" | "phrase";
+    };
+
+    const wordInputs: CloudInput[] = words.map((w) => ({
+      key: `word:${w.text}`,
+      type: "word" as const,
+      text: w.text,
+      href: w.href,
+      count: w.count,
+      kind: w.kind,
       size: sizeForCount(w.count, counts.min, counts.max, size.width),
       weight: weightForCount(w.count, counts.min, counts.max),
     }));
 
-    type CloudInput = CloudWord & { size: number; weight: number };
+    // Same-size faces; short placeholder text so d3 reserves a round footprint.
+    const faceInputs: CloudInput[] = people.map((p) => ({
+      key: `person:${p.id}`,
+      type: "person" as const,
+      text: "@@@@@",
+      href: p.href,
+      name: p.name,
+      avatarUrl: p.avatarUrl,
+      size: FACE_SIZE * 0.72,
+      weight: 600,
+    }));
+
+    // Deterministic-ish shuffle from seed so layout is stable within a visit,
+    // but faces are mixed through the words rather than clustered.
+    const rng = (() => {
+      let s = Math.floor(orderSeed * 1e9) || 1;
+      return () => {
+        s = (s * 1664525 + 1013904223) % 4294967296;
+        return s / 4294967296;
+      };
+    })();
+    const mixed = [...wordInputs, ...faceInputs];
+    for (let i = mixed.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1));
+      [mixed[i], mixed[j]] = [mixed[j], mixed[i]];
+    }
+
     type CloudOutput = CloudInput & {
       x?: number;
       y?: number;
@@ -121,8 +206,8 @@ export function WordCloud({ words }: Props) {
 
     cloud<CloudInput>()
       .size([size.width, size.height])
-      .words(input)
-      .padding(10)
+      .words(mixed)
+      .padding(12)
       .rotate(() => 0)
       .font("Fraunces, Georgia, serif")
       .fontSize((d) => d.size)
@@ -133,14 +218,15 @@ export function WordCloud({ words }: Props) {
         const mapped = output
           .filter((d) => d.x != null && d.y != null)
           .map((d) => ({
-            text: d.text,
-            count: d.count,
+            key: d.key,
+            type: d.type,
+            text: d.type === "person" ? d.name || d.text : d.text,
             href: d.href,
-            kind: d.kind,
+            avatarUrl: d.avatarUrl,
+            name: d.name,
             x: d.x!,
             y: d.y!,
-            size: d.size,
-            rotate: d.rotate ?? 0,
+            size: d.type === "person" ? FACE_SIZE : d.size,
             weight: d.weight,
           }));
         setLaidOut(mapped);
@@ -151,9 +237,9 @@ export function WordCloud({ words }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [words, size.width, size.height, counts.min, counts.max]);
+  }, [words, people, size.width, size.height, counts.min, counts.max, orderSeed]);
 
-  if (words.length === 0) {
+  if (words.length === 0 && people.length === 0) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6 text-center">
         <p className="max-w-sm font-[family-name:var(--font-display)] text-2xl text-[var(--muted)]">
@@ -171,75 +257,190 @@ export function WordCloud({ words }: Props) {
         viewBox={`0 0 ${size.width} ${size.height}`}
         className="mx-auto block touch-manipulation"
         role="img"
-        aria-label="Words people have said about you"
+        aria-label="Words and people who love you"
       >
+        <defs>
+          {laidOut
+            .filter((item) => item.type === "person")
+            .map((person) => (
+              <clipPath key={`clip-${person.key}`} id={`clip-${person.key}`}>
+                <circle cx={0} cy={0} r={FACE_SIZE / 2} />
+              </clipPath>
+            ))}
+        </defs>
         <g transform={`translate(${size.width / 2}, ${size.height / 2})`}>
-          {laidOut.map((word, index) => {
+          {laidOut.map((item, index) => {
             const delay = reducedMotion ? 0 : (index % 24) * 0.04;
             const fromX = reducedMotion
-              ? word.x
-              : word.x + (word.x >= 0 ? 1 : -1) * (80 + (index % 5) * 24);
+              ? item.x
+              : item.x + (item.x >= 0 ? 1 : -1) * (80 + (index % 5) * 24);
             const fromY = reducedMotion
-              ? word.y
-              : word.y + (word.y >= 0 ? 1 : -1) * (60 + (index % 7) * 18);
-            const isActive = active === word.text;
-            const box = hitBox(word);
+              ? item.y
+              : item.y + (item.y >= 0 ? 1 : -1) * (60 + (index % 7) * 18);
+            const isActive = active === item.key;
+            const box = hitBox(item);
+            const src = item.avatarUrl ? playableUrl(item.avatarUrl) : null;
 
             return (
-              <g key={word.text}>
-                <Link
-                  href={word.href}
-                  onMouseEnter={() => setActive(word.text)}
-                  onMouseLeave={() => setActive(null)}
-                  onFocus={() => setActive(word.text)}
-                  onBlur={() => setActive(null)}
-                >
+              <g key={item.key}>
+                {item.type === "person" ? (
                   <g
-                    style={{
-                      opacity: ready
-                        ? active && !isActive
-                          ? 0.35
-                          : 0.9
-                        : 0,
-                      transform: ready
-                        ? `translate(${word.x}px, ${word.y}px) scale(${
-                            isActive ? 1.06 : 1
-                          })`
-                        : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
-                      transition: reducedMotion
-                        ? "opacity 0.6s ease"
-                        : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Enlarge photo of ${item.name || item.text}`}
+                    onClick={() => {
+                      const src = item.avatarUrl
+                        ? playableUrl(item.avatarUrl)
+                        : null;
+                      if (!src) {
+                        window.location.href = item.href;
+                        return;
+                      }
+                      setFaceLightbox([
+                        {
+                          id: item.key,
+                          src,
+                          alt: item.name || item.text,
+                          caption: item.name,
+                          footerHref: item.href,
+                          footerLabel: `See ${item.name}`,
+                        },
+                      ]);
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        (e.currentTarget as SVGElement).dispatchEvent(
+                          new MouseEvent("click", { bubbles: true }),
+                        );
+                      }
+                    }}
+                    onMouseEnter={() => setActive(item.key)}
+                    onMouseLeave={() => setActive(null)}
+                    onFocus={() => setActive(item.key)}
+                    onBlur={() => setActive(null)}
+                    style={{ cursor: "pointer" }}
                   >
-                    <rect
-                      x={-box.width / 2}
-                      y={-box.height / 2}
-                      width={box.width}
-                      height={box.height}
-                      fill="transparent"
-                    />
-                    <text
-                      textAnchor="middle"
-                      dominantBaseline="middle"
-                      fill={wordFill(index, isActive)}
-                      fontFamily="var(--font-display), Georgia, serif"
-                      fontSize={word.size}
-                      fontWeight={word.weight}
+                    <g
                       style={{
-                        cursor: "pointer",
-                        transition: "fill 0.2s ease",
-                        pointerEvents: "none",
+                        opacity: ready
+                          ? active && !isActive
+                            ? 0.35
+                            : 0.92
+                          : 0,
+                        transform: ready
+                          ? `translate(${item.x}px, ${item.y}px) scale(${
+                              isActive ? 1.06 : 1
+                            })`
+                          : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
+                        transition: reducedMotion
+                          ? "opacity 0.6s ease"
+                          : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
                       }}
                     >
-                      {word.text}
-                    </text>
+                      <rect
+                        x={-box.width / 2}
+                        y={-box.height / 2}
+                        width={box.width}
+                        height={box.height}
+                        fill="transparent"
+                      />
+                      <g style={{ pointerEvents: "none" }}>
+                        <circle
+                          r={FACE_SIZE / 2 + 2}
+                          fill="var(--surface)"
+                          stroke="var(--rose)"
+                          strokeOpacity={isActive ? 0.9 : 0.45}
+                          strokeWidth={2}
+                        />
+                        {src ? (
+                          <image
+                            href={src}
+                            x={-FACE_SIZE / 2}
+                            y={-FACE_SIZE / 2}
+                            width={FACE_SIZE}
+                            height={FACE_SIZE}
+                            clipPath={`url(#clip-${item.key})`}
+                            preserveAspectRatio="xMidYMid slice"
+                          />
+                        ) : (
+                          <>
+                            <circle r={FACE_SIZE / 2} fill="var(--sage)" />
+                            <text
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              fill="var(--ground)"
+                              fontFamily="var(--font-display), Georgia, serif"
+                              fontSize={18}
+                            >
+                              {initials(item.name || item.text)}
+                            </text>
+                          </>
+                        )}
+                      </g>
+                    </g>
                   </g>
-                </Link>
+                ) : (
+                  <Link
+                    href={item.href}
+                    onMouseEnter={() => setActive(item.key)}
+                    onMouseLeave={() => setActive(null)}
+                    onFocus={() => setActive(item.key)}
+                    onBlur={() => setActive(null)}
+                  >
+                    <g
+                      style={{
+                        opacity: ready
+                          ? active && !isActive
+                            ? 0.35
+                            : 0.92
+                          : 0,
+                        transform: ready
+                          ? `translate(${item.x}px, ${item.y}px) scale(${
+                              isActive ? 1.06 : 1
+                            })`
+                          : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
+                        transition: reducedMotion
+                          ? "opacity 0.6s ease"
+                          : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
+                      }}
+                    >
+                      <rect
+                        x={-box.width / 2}
+                        y={-box.height / 2}
+                        width={box.width}
+                        height={box.height}
+                        fill="transparent"
+                      />
+                      <text
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                        fill={wordFill(index, isActive)}
+                        fontFamily="var(--font-display), Georgia, serif"
+                        fontSize={item.size}
+                        fontWeight={item.weight}
+                        style={{
+                          cursor: "pointer",
+                          transition: "fill 0.2s ease",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {item.text}
+                      </text>
+                    </g>
+                  </Link>
+                )}
               </g>
             );
           })}
         </g>
       </svg>
+      <LightboxOverlay
+        photos={faceLightbox || []}
+        index={faceLightbox ? 0 : null}
+        onClose={() => setFaceLightbox(null)}
+        onChangeIndex={() => {}}
+      />
     </div>
   );
 }

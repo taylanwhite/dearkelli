@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { EnlargeableImage } from "@/components/EnlargeableImage";
 import { PersonBubble } from "@/components/PersonBubble";
 
 export type SupercutClip = {
@@ -170,11 +171,27 @@ export function Supercut({ clips, label }: Props) {
           </div>
         )}
         {current.kind === "image" && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <EnlargeableImage
             src={current.posterUrl || current.blobUrl}
             alt={current.title || `From ${current.contributorName}`}
-            className="aspect-video w-full object-contain"
+            className="aspect-video w-full bg-[var(--sage-deep)]"
+            imgClassName="aspect-video w-full object-contain"
+            caption={current.title}
+            gallery={clips
+              .filter((c) => c.kind === "image")
+              .map((c) => ({
+                id: c.id,
+                src: c.posterUrl || c.blobUrl,
+                alt: c.title || `From ${c.contributorName}`,
+                caption: c.title,
+                contributorName: c.contributorName,
+              }))}
+            galleryIndex={Math.max(
+              0,
+              clips
+                .filter((c) => c.kind === "image")
+                .findIndex((c) => c.id === current.id),
+            )}
           />
         )}
       </div>

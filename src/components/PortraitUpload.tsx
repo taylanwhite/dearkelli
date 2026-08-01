@@ -2,7 +2,9 @@
 
 import { upload } from "@vercel/blob/client";
 import { useEffect, useRef, useState } from "react";
+import { EnlargeableImage } from "@/components/EnlargeableImage";
 import { playableUrl } from "@/lib/blob";
+import { isOverUploadLimit, uploadLimitMessage } from "@/lib/media";
 
 type Props = {
   token: string;
@@ -19,7 +21,6 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
   );
   const [error, setError] = useState<string | null>(null);
 
-  // Keep preview in sync when parent clears the avatar (e.g. removed from list)
   useEffect(() => {
     setRemoteUrl(initialUrl ?? null);
     if (initialUrl) {
@@ -38,6 +39,13 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
 
   async function handleFile(file: File) {
     setError(null);
+
+    if (isOverUploadLimit(file.size)) {
+      setStatus("error");
+      setError(uploadLimitMessage(file.name));
+      return;
+    }
+
     setStatus("uploading");
     const local = URL.createObjectURL(file);
     setLocalPreview(local);
@@ -54,7 +62,6 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
         }),
       });
 
-      // Portrait is only for their circle, not the photo album.
       const res = await fetch(`/api/contributor/${token}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -86,25 +93,29 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
         name among the words.
       </p>
 
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={status === "uploading"}
-        className="mx-auto mt-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[var(--forest)] text-[var(--ground)] ring-2 ring-[var(--gold)]/40 transition hover:ring-[var(--gold)] disabled:opacity-70"
-      >
-        {previewSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+      {previewSrc ? (
+        <div className="mx-auto mt-5 w-28">
+          <EnlargeableImage
             src={previewSrc}
             alt="Your photo"
-            className="h-full w-full object-cover"
+            rounded="rounded-full"
+            className="mx-auto h-28 w-28 ring-2 ring-[var(--gold)]/40"
+            imgClassName="h-full w-full object-cover"
+            caption="Your photo"
           />
-        ) : (
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={status === "uploading"}
+          className="mx-auto mt-5 flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[var(--forest)] text-[var(--ground)] ring-2 ring-[var(--gold)]/40 transition hover:ring-[var(--gold)] disabled:opacity-70"
+        >
           <span className="px-3 text-sm leading-snug text-[var(--ground)]/90">
             {status === "uploading" ? "Sending…" : "Add photo"}
           </span>
-        )}
-      </button>
+        </button>
+      )}
 
       <input
         ref={inputRef}

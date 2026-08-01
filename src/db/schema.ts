@@ -40,7 +40,7 @@ export const media = pgTable(
     contributorId: uuid("contributor_id")
       .notNull()
       .references(() => contributors.id, { onDelete: "cascade" }),
-    blobUrl: text("blob_url").notNull(),
+    blobUrl: text("blob_url").notNull().unique(),
     kind: mediaKindEnum("kind").notNull(),
     durationSeconds: integer("duration_seconds"),
     width: integer("width"),

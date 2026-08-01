@@ -2,9 +2,13 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { contributors, media } from "@/db/schema";
-import { scheduleMediaProcessing } from "@/lib/enqueue-process";
-import { ALLOWED_CONTENT_TYPES, kindFromMime } from "@/lib/media";
+import { contributors } from "@/db/schema";
+import { ensureMediaRecord } from "@/lib/ensure-media";
+import {
+  ALLOWED_CONTENT_TYPES,
+  MAX_UPLOAD_BYTES,
+  kindFromMime,
+} from "@/lib/media";
 
 export const runtime = "nodejs";
 
@@ -62,7 +66,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         return {
           allowedContentTypes: ALLOWED_CONTENT_TYPES,
           addRandomSuffix: true,
-          maximumSizeInBytes: 500 * 1024 * 1024,
+          maximumSizeInBytes: MAX_UPLOAD_BYTES,
           tokenPayload: JSON.stringify(payload),
         };
       },
@@ -83,39 +87,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             return;
           }
 
-          const existing = await db
-            .select({ id: media.id })
-            .from(media)
-            .where(eq(media.blobUrl, blob.url))
-            .limit(1);
-
-          if (existing.length > 0) {
-            const [row] = await db
-              .select({ id: media.id, status: media.status })
-              .from(media)
-              .where(eq(media.blobUrl, blob.url))
-              .limit(1);
-            if (
-              row &&
-              (row.status === "uploaded" || row.status === "failed")
-            ) {
-              scheduleMediaProcessing(row.id);
-            }
-            return;
-          }
-
-          const [created] = await db
-            .insert(media)
-            .values({
-              contributorId: payload.contributorId,
-              blobUrl: blob.url,
-              kind: payload.kind,
-              status: "uploaded",
-              originalFilename: payload.originalFilename,
-            })
-            .returning({ id: media.id });
-
-          scheduleMediaProcessing(created.id);
+          await ensureMediaRecord({
+            contributorId: payload.contributorId,
+            blobUrl: blob.url,
+            kind: payload.kind,
+            originalFilename: payload.originalFilename,
+          });
         } catch (error) {
           console.error("onUploadCompleted failed", error);
           throw error;
