@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonBubble } from "@/components/PersonBubble";
-import { PhotoLightbox } from "@/components/PhotoLightbox";
-import { TrackedAvPlayer } from "@/components/TrackedAvPlayer";
+import { PersonMedia } from "@/components/PersonMedia";
 import { playableUrl } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
@@ -17,8 +16,6 @@ export default async function PersonPage({ params }: Props) {
   if (!data) notFound();
 
   const { person, clips, topWords } = data;
-  const photos = clips.filter((c) => c.kind === "image");
-  const spoken = clips.filter((c) => c.kind !== "image");
 
   // A handful of words, no frequencies, just the flavor of their voice
   const softWords = topWords.slice(0, 8);
@@ -59,39 +56,23 @@ export default async function PersonPage({ params }: Props) {
         </p>
       )}
 
-      {spoken.length > 0 && (
-        <section className="mt-14 space-y-10">
-          {spoken.map((clip) => (
-            <TrackedAvPlayer
-              key={clip.id}
-              id={clip.id}
-              kind={clip.kind === "video" ? "video" : "audio"}
-              src={playableUrl(clip.blobUrl)}
-              poster={
-                clip.posterUrl ? playableUrl(clip.posterUrl) : undefined
-              }
-              title={clip.title}
-              summary={clip.summary}
-            />
-          ))}
-        </section>
-      )}
-
-      {photos.length > 0 && (
-        <section className="mt-16">
-          <PhotoLightbox
-            layout="grid"
-            showAttribution={false}
-            photos={photos.map((photo) => ({
-              id: photo.id,
-              src: playableUrl(photo.posterUrl || photo.blobUrl),
-              alt: photo.caption || `From ${person.name}`,
-              caption: photo.caption || photo.title,
-              contributorName: person.name,
-            }))}
-          />
-        </section>
-      )}
+      <PersonMedia
+        personName={person.name}
+        items={clips.map((clip) => ({
+          id: clip.id,
+          kind: clip.kind,
+          src: playableUrl(
+            clip.kind === "image"
+              ? clip.posterUrl || clip.blobUrl
+              : clip.blobUrl,
+          ),
+          poster: clip.posterUrl ? playableUrl(clip.posterUrl) : undefined,
+          title: clip.title,
+          summary: clip.summary,
+          caption: clip.caption,
+          alt: clip.caption || clip.title || `From ${person.name}`,
+        }))}
+      />
     </main>
   );
 }

@@ -58,35 +58,184 @@ async function loadFfmpeg() {
   const ffmpegPath = (await import("@ffmpeg-installer/ffmpeg")).default;
   const ffmpeg = (await import("fluent-ffmpeg")).default;
   ffmpeg.setFfmpegPath(ffmpegPath.path);
+  try {
+    const ffprobePath = (await import("@ffprobe-installer/ffprobe")).default;
+    ffmpeg.setFfprobePath(ffprobePath.path);
+  } catch {
+    /* duration/poster still work via ffmpeg in many builds */
+  }
   return ffmpeg;
 }
 
-function extractAudio(
+type ExtractedAudio = {
+  path: string;
+  filename: string;
+  mime: string;
+};
+
+const PROCESSED_PUT = {
+  access: BLOB_ACCESS,
+  allowOverwrite: true as const,
+};
+
+/** First real audio track (skip iPhone data/tmcd "codec none" streams). */
+function findUsableAudioStreamIndex(
+  ffmpeg: typeof import("fluent-ffmpeg"),
+  inputPath: string,
+): Promise<number | null> {
+  return new Promise((resolve) => {
+    ffmpeg.ffprobe(inputPath, (err, data) => {
+      if (err || !data?.streams?.length) {
+        resolve(null);
+        return;
+      }
+      const audio = data.streams.find((stream) => {
+        const name = (stream.codec_name || "").toLowerCase();
+        return (
+          stream.codec_type === "audio" &&
+          name &&
+          name !== "none" &&
+          name !== "unknown"
+        );
+      });
+      resolve(typeof audio?.index === "number" ? audio.index : null);
+    });
+  });
+}
+
+function runAudioExtract(
   ffmpeg: typeof import("fluent-ffmpeg"),
   inputPath: string,
   outputPath: string,
-  opts?: { maxSeconds?: number },
+  opts: {
+    maxSeconds: number;
+    codec: string;
+    format: string;
+    bitrate?: string;
+    frequency?: number;
+    /** Absolute stream index from ffprobe, e.g. 1 */
+    audioStreamIndex: number | null;
+  },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
-    let cmd = ffmpeg(inputPath)
-      .noVideo()
-      .audioChannels(1)
-      .audioFrequency(16000)
-      .audioCodec("libmp3lame")
-      .audioBitrate("64k")
-      .format("mp3")
-      .outputOptions(["-vn", "-map_metadata", "-1"]);
+    let stderr = "";
+    const mapArgs =
+      opts.audioStreamIndex != null
+        ? ["-map", `0:${opts.audioStreamIndex}`]
+        : ["-map", "0:a:0"];
 
-    // Cap length so huge phone videos still yield a Whisper-sized MP3.
-    if (opts?.maxSeconds && opts.maxSeconds > 0) {
-      cmd = cmd.duration(opts.maxSeconds);
+    let cmd = ffmpeg(inputPath)
+      .inputOptions([
+        "-hide_banner",
+        "-nostdin",
+        "-analyzeduration",
+        "100M",
+        "-probesize",
+        "100M",
+      ])
+      .outputOptions([
+        "-vn",
+        "-sn",
+        "-dn", // drop video / subtitles / data (tmcd) streams
+        ...mapArgs,
+        "-ac",
+        "1",
+        "-ar",
+        String(opts.frequency ?? 16000),
+        "-t",
+        String(opts.maxSeconds),
+        "-map_metadata",
+        "-1",
+        "-ignore_unknown",
+        "-y",
+      ])
+      .audioCodec(opts.codec)
+      .format(opts.format);
+
+    if (opts.bitrate) {
+      cmd = cmd.audioBitrate(opts.bitrate);
     }
 
     cmd
+      .on("stderr", (line: string) => {
+        stderr += `${line}\n`;
+      })
       .on("end", () => resolve())
-      .on("error", reject)
+      .on("error", (err: Error) => {
+        const detail = stderr.trim().split("\n").slice(-8).join(" | ");
+        reject(
+          new Error(
+            detail
+              ? `${err.message} (${detail.slice(0, 500)})`
+              : err.message,
+          ),
+        );
+      })
       .save(outputPath);
   });
+}
+
+/** Pull a Whisper-sized soundtrack. Tries MP3, then WAV. */
+async function extractAudioForWhisper(
+  ffmpeg: typeof import("fluent-ffmpeg"),
+  inputPath: string,
+  workDir: string,
+  maxSeconds = 5 * 60,
+): Promise<ExtractedAudio> {
+  const audioStreamIndex = await findUsableAudioStreamIndex(ffmpeg, inputPath);
+  if (audioStreamIndex == null) {
+    throw new Error("No usable audio track found in this file");
+  }
+
+  const attempts: {
+    filename: string;
+    mime: string;
+    codec: string;
+    format: string;
+    bitrate?: string;
+  }[] = [
+    {
+      filename: "audio.mp3",
+      mime: "audio/mpeg",
+      codec: "libmp3lame",
+      format: "mp3",
+      bitrate: "64k",
+    },
+    {
+      filename: "audio.wav",
+      mime: "audio/wav",
+      codec: "pcm_s16le",
+      format: "wav",
+    },
+  ];
+
+  let lastError: Error | null = null;
+  for (const attempt of attempts) {
+    const outputPath = join(workDir, attempt.filename);
+    try {
+      await runAudioExtract(ffmpeg, inputPath, outputPath, {
+        maxSeconds,
+        codec: attempt.codec,
+        format: attempt.format,
+        bitrate: attempt.bitrate,
+        audioStreamIndex,
+      });
+      const buf = await readFile(outputPath);
+      if (buf.byteLength < 256) {
+        throw new Error("Extracted audio was empty");
+      }
+      return {
+        path: outputPath,
+        filename: attempt.filename,
+        mime: attempt.mime,
+      };
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      console.warn(`Audio extract via ${attempt.format} failed`, lastError);
+    }
+  }
+
+  throw lastError || new Error("Audio extract failed");
 }
 
 function extractPoster(
@@ -96,8 +245,9 @@ function extractPoster(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     ffmpeg(inputPath)
+      .inputOptions(["-analyzeduration", "100M", "-probesize", "100M"])
       .screenshots({
-        timestamps: ["1"],
+        timestamps: ["0.5"],
         filename: outputPath.split("/").pop()!,
         folder: outputPath.replace(/\/[^/]+$/, ""),
         size: "1280x?",
@@ -295,11 +445,11 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
     .toBuffer();
 
   const jpegBlob = await put(`processed/${item.id}/full.jpg`, oriented, {
-    access: BLOB_ACCESS,
+    ...PROCESSED_PUT,
     contentType: "image/jpeg",
   });
   const thumbBlob = await put(`processed/${item.id}/thumb.jpg`, thumb, {
-    access: BLOB_ACCESS,
+    ...PROCESSED_PUT,
     contentType: "image/jpeg",
   });
 
@@ -393,7 +543,6 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     item.originalFilename?.split(".").pop()?.toLowerCase() ||
     (item.kind === "audio" ? "m4a" : "mp4");
   const sourcePath = join(workDir, `source.${ext}`);
-  const audioPath = join(workDir, "audio.mp3");
   const posterPath = join(workDir, "poster.jpg");
 
   await downloadBlobToFile(item.blobUrl, sourcePath);
@@ -435,7 +584,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         const posterBlob = await put(
           `processed/${item.id}/poster.jpg`,
           posterBuf,
-          { access: BLOB_ACCESS, contentType: "image/jpeg" },
+          { ...PROCESSED_PUT, contentType: "image/jpeg" },
         );
         posterUrl = posterBlob.url;
       } catch (err) {
@@ -443,32 +592,37 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       }
     }
 
-    // Whisper 25MB limit — always pull a compact soundtrack for video / big files.
-    if (sourceSize > 20 * 1024 * 1024 || item.kind === "video") {
+    // Always pull a compact soundtrack for video (iPhone MOVs are often
+    // huge in bytes even when only ~30s long). Cap at 5 minutes for Whisper.
+    if (item.kind === "video" || sourceSize > 20 * 1024 * 1024) {
       try {
-        await extractAudio(ffmpeg, sourcePath, audioPath, {
-          maxSeconds: 5 * 60,
-        });
-        transcriptPath = audioPath;
-        transcriptName = "audio.mp3";
-        transcriptMime = "audio/mpeg";
+        const extracted = await extractAudioForWhisper(
+          ffmpeg,
+          sourcePath,
+          workDir,
+          5 * 60,
+        );
+        transcriptPath = extracted.path;
+        transcriptName = extracted.filename;
+        transcriptMime = extracted.mime;
       } catch (err) {
-        console.warn("Audio extract failed, trying source file", err);
-        if (sourceSize > 25 * 1024 * 1024) {
-          await markVisibleWithoutAi(item, {
-            error:
-              "Couldn't pull audio for transcription (file too large). The video still shows for Kelli.",
-            duration,
-            posterUrl,
-          });
-          return;
-        }
+        const detail =
+          err instanceof Error ? err.message : "unknown extract error";
+        console.warn("Audio extract failed", err);
+        // Do not blame "file too large" — short 4K MOVs are big in bytes.
+        // If extract failed, we cannot send the giant video to Whisper.
+        await markVisibleWithoutAi(item, {
+          error: `Couldn't extract audio for transcription: ${detail}`,
+          duration,
+          posterUrl,
+        });
+        return;
       }
     }
-  } else if (sourceSize > 25 * 1024 * 1024) {
+  } else if (item.kind === "video" || sourceSize > 25 * 1024 * 1024) {
     await markVisibleWithoutAi(item, {
       error:
-        "File is too large to transcribe without ffmpeg. It still shows for Kelli.",
+        "Couldn't transcribe without ffmpeg on this server. The file still shows for Kelli.",
       duration,
       posterUrl,
     });
