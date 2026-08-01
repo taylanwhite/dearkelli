@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MyUploads } from "./MyUploads";
 import { PortraitUpload } from "./PortraitUpload";
 import { UploadZone } from "./UploadZone";
+import { VoiceRecorder } from "./VoiceRecorder";
 
 type Contributor = {
   id: string;
@@ -172,9 +173,14 @@ export function SendForm({ contributor, isGeneric }: Props) {
             }}
           />
 
+          <VoiceRecorder
+            token={contributor.inviteToken}
+            onSent={() => setUploadsKey((k) => k + 1)}
+          />
+
           <div>
             <p className="mb-3 text-center text-sm text-[var(--cream)]/50">
-              Then anything else you want. A voice memo, a video, more photos.
+              Or send a video, more photos, or a memo from your phone.
             </p>
             <UploadZone
               token={contributor.inviteToken}
