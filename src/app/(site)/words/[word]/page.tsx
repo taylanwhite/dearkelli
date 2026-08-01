@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Supercut } from "@/components/Supercut";
 import { playbackSrc, playableUrl } from "@/lib/blob";
 import { getPhraseOccurrences, getWordOccurrences } from "@/lib/queries";
@@ -43,13 +42,7 @@ export default async function WordPage({ params, searchParams }: Props) {
   return (
     <main className="pt-8">
       <div className="mx-auto mb-10 max-w-2xl px-5 text-center">
-        <Link
-          href="/"
-          className="text-sm text-[var(--cream)]/45 transition hover:text-[var(--forest)]"
-        >
-          ← All the words
-        </Link>
-        <h1 className="mt-6 break-words font-[family-name:var(--font-display)] text-4xl text-[var(--gold-deep)] sm:text-6xl">
+        <h1 className="break-words font-[family-name:var(--font-display)] text-4xl text-[var(--gold-deep)] sm:text-6xl">
           {word}
         </h1>
       </div>

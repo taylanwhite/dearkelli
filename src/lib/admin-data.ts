@@ -109,6 +109,7 @@ export async function getAdminMedia() {
       summary: media.summary,
       blobUrl: media.blobUrl,
       posterUrl: media.posterUrl,
+      playbackUrl: media.playbackUrl,
       originalFilename: media.originalFilename,
       durationSeconds: media.durationSeconds,
       themes: media.themes,

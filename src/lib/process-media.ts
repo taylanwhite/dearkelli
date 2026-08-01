@@ -362,28 +362,14 @@ async function transcribeFile(
   };
 }
 
-async function enrichFromText(openai: OpenAI, fullText: string) {
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.4,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content: `You label loving messages about Kelli for a keepsake word cloud.
-Return JSON:
-{
-  "title": string (max 6 words, warm),
-  "summary": string (1-2 sentences, tender),
-  "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words for the word cloud. ${AI_TAG_GUIDANCE})
-}`,
-      },
-      { role: "user", content: fullText.slice(0, 6000) },
-    ],
-  });
+type TextEnrichment = {
+  title: string;
+  summary: string | null;
+  themes: string[];
+  tags: string[];
+};
 
-  const raw = completion.choices[0]?.message?.content || "{}";
+function parseTextEnrichment(raw: string, fallbackTitle: string): TextEnrichment {
   try {
     const parsed = JSON.parse(raw) as {
       title?: string;
@@ -396,19 +382,108 @@ Return JSON:
     );
     const tags = filterWarmAiTags(parsed.tags || []);
     return {
-      title: parsed.title?.slice(0, 80) || "A message for Kelli",
+      title: parsed.title?.slice(0, 80) || fallbackTitle,
       summary: parsed.summary?.slice(0, 400) || null,
       themes: themes.slice(0, 3),
       tags,
     };
   } catch {
     return {
-      title: "A message for Kelli",
-      summary: null as string | null,
-      themes: [] as string[],
-      tags: [] as string[],
+      title: fallbackTitle,
+      summary: null,
+      themes: [],
+      tags: [],
     };
   }
+}
+
+async function enrichFromText(openai: OpenAI, fullText: string) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.3,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `You label a spoken message or video soundtrack for Kelli's keepsake.
+
+Rules for title and summary:
+- Stay faithful to what was actually said. No invented scenes, no invented praise.
+- If people are playing, laughing, or talking about ordinary things, say that plainly.
+- Do not write as if every clip is a love letter to Kelli unless the words say so.
+- Title: max 6 words, concrete (e.g. "Kids by the red car"), not poetic filler.
+- Summary: 1-2 plain sentences about the real moment in the transcript.
+
+Word-cloud tags may be warmer, but only when they fit what was said.
+Return JSON:
+{
+  "title": string,
+  "summary": string,
+  "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
+  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
+}`,
+      },
+      { role: "user", content: fullText.slice(0, 6000) },
+    ],
+  });
+
+  return parseTextEnrichment(
+    completion.choices[0]?.message?.content || "{}",
+    "A message for Kelli",
+  );
+}
+
+/** Video: prefer what the frame shows; use transcript only as supporting detail. */
+async function enrichVideo(
+  openai: OpenAI,
+  opts: { transcriptText: string; posterJpeg?: Buffer | null },
+) {
+  const transcript = opts.transcriptText.trim();
+  const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [
+    {
+      type: "text",
+      text: `This is a keepsake video for Kelli.
+
+Rules for title and summary:
+- Describe the real scene. Stay concrete. No invented praise or poetic fluff.
+- If a still frame is attached, trust what you see in the image over vague soundtrack noise.
+- Do not write as if every clip is a love letter to Kelli unless someone clearly says so.
+- Title: max 6 plain words (e.g. "Kids by the red car").
+- Summary: 1-2 honest sentences about the moment.
+
+${transcript ? `Soundtrack / speech transcript:\n${transcript.slice(0, 4000)}` : "No clear speech transcript (ambient sound or silent)."}
+
+Return JSON:
+{
+  "title": string,
+  "summary": string,
+  "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
+  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
+}`,
+    },
+  ];
+
+  if (opts.posterJpeg?.byteLength) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:image/jpeg;base64,${opts.posterJpeg.toString("base64")}`,
+      },
+    });
+  }
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.3,
+    max_tokens: 400,
+    response_format: { type: "json_object" },
+    messages: [{ role: "user", content }],
+  });
+
+  return parseTextEnrichment(
+    completion.choices[0]?.message?.content || "{}",
+    "A video for Kelli",
+  );
 }
 
 async function enrichImage(
@@ -427,13 +502,21 @@ async function enrichImage(
         content: [
           {
             type: "text",
-            text: `This photo is a keepsake for Kelli. Look for love, warmth, and meaning, not a catalog of objects.
+            text: `This photo is a keepsake for Kelli.
+
+Rules for title and caption:
+- Describe what is actually in the photo. Stay concrete.
+- Do not invent emotions or bonds that the image does not show.
+- Title: max 6 plain words (e.g. "Kids by the red car").
+- Caption: one honest sentence about the scene.
+
+Tags may be warmer when they fit the image.
 Return JSON:
 {
-  "title": string (max 6 words, warm),
-  "caption": string (one tender sentence about the feeling or bond, not a dry description),
+  "title": string,
+  "caption": string,
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words for the word cloud. ${AI_TAG_GUIDANCE})
+  "tags": string[] (5-12 lowercase single words. ${AI_TAG_GUIDANCE})
 }`,
           },
           { type: "image_url", image_url: { url: dataUrl } },
@@ -748,27 +831,34 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
   );
   const detected = detectPhrases(timed);
 
-  let enrichment: {
-    title: string;
-    summary: string | null;
-    themes: string[];
-    tags: string[];
-  };
+  let enrichment: TextEnrichment;
   try {
-    enrichment = transcript.text.trim()
-      ? await enrichFromText(openai, transcript.text)
-      : {
-          title:
-            item.kind === "audio" ? "A voice for Kelli" : "A message for Kelli",
-          summary: null,
-          themes: [],
-          tags: [],
-        };
+    if (item.kind === "video") {
+      let posterJpeg: Buffer | null = null;
+      try {
+        posterJpeg = await readFile(posterPath);
+      } catch {
+        /* poster may be missing */
+      }
+      enrichment = await enrichVideo(openai, {
+        transcriptText: transcript.text,
+        posterJpeg,
+      });
+    } else if (transcript.text.trim()) {
+      enrichment = await enrichFromText(openai, transcript.text);
+    } else {
+      enrichment = {
+        title: "A voice for Kelli",
+        summary: null,
+        themes: [],
+        tags: [],
+      };
+    }
   } catch (err) {
     console.warn("Text enrichment failed", err);
     enrichment = {
       title:
-        item.kind === "audio" ? "A voice for Kelli" : "A message for Kelli",
+        item.kind === "audio" ? "A voice for Kelli" : "A video for Kelli",
       summary: null,
       themes: [],
       tags: [],

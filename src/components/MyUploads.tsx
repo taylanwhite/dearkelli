@@ -107,8 +107,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
           What you&apos;ve sent
         </p>
         <p className="mt-1 text-sm text-[var(--cream)]/55">
-          Tap a photo to see it bigger. Remove anything that shouldn&apos;t be
-          here.
+          Tap a photo to see it bigger.
         </p>
       </div>
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EnlargeableImage } from "@/components/EnlargeableImage";
-import { playableUrl } from "@/lib/blob";
+import { playableUrl, playbackSrc } from "@/lib/blob";
 
 export type AdminMediaItem = {
   id: string;
@@ -14,6 +14,7 @@ export type AdminMediaItem = {
   summary: string | null;
   blobUrl: string;
   posterUrl: string | null;
+  playbackUrl: string | null;
   originalFilename: string | null;
   durationSeconds: number | null;
   themes: string[] | null;
@@ -61,6 +62,7 @@ export function MediaAdmin({ initialMedia }: Props) {
   const [items, setItems] = useState(initialMedia);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
 
   const visible = useMemo(() => {
     let list = items;
@@ -208,6 +210,34 @@ export function MediaAdmin({ initialMedia }: Props) {
                       ]}
                     />
                   )}
+                  {(item.kind === "video" || item.kind === "audio") && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPlayingId((id) => (id === item.id ? null : item.id))
+                      }
+                      className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[var(--forest)]/15"
+                      aria-label={
+                        playingId === item.id ? "Hide player" : "Play"
+                      }
+                    >
+                      {item.posterUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`/api/media/stream?url=${encodeURIComponent(item.posterUrl)}`}
+                          alt=""
+                          className="h-full w-full object-cover opacity-80"
+                        />
+                      ) : (
+                        <span className="flex h-full w-full items-center justify-center text-xs uppercase tracking-wide text-[var(--cream)]/50">
+                          {item.kind}
+                        </span>
+                      )}
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-white">
+                        {playingId === item.id ? "Hide" : "Play"}
+                      </span>
+                    </button>
+                  )}
                   <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
@@ -233,6 +263,22 @@ export function MediaAdmin({ initialMedia }: Props) {
                       >
                         {formatViews(item.viewCount)}
                       </span>
+                      {item.kind === "video" && (
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
+                            item.playbackUrl
+                              ? "bg-[var(--sage)]/25 text-[var(--cream)]/70"
+                              : "bg-[var(--forest)]/20 text-[var(--forest)]"
+                          }`}
+                          title={
+                            item.playbackUrl
+                              ? "Playing the compressed web MP4"
+                              : "No playback file — streaming the original upload. Requeue to encode."
+                          }
+                        >
+                          {item.playbackUrl ? "web play" : "original only"}
+                        </span>
+                      )}
                       {item.isTest && (
                     <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--gold)]">
                       test
@@ -337,9 +383,61 @@ export function MediaAdmin({ initialMedia }: Props) {
                   {item.id}
                 </p>
 
+                {playingId === item.id &&
+                  (item.kind === "video" || item.kind === "audio") && (
+                    <div className="mt-3 overflow-hidden rounded-xl bg-black/40">
+                      {item.kind === "video" ? (
+                        <video
+                          key={item.id}
+                          src={playbackSrc({
+                            playbackUrl: item.playbackUrl,
+                            blobUrl: item.blobUrl,
+                          })}
+                          poster={
+                            item.posterUrl
+                              ? playableUrl(item.posterUrl)
+                              : undefined
+                          }
+                          controls
+                          playsInline
+                          autoPlay
+                          className="max-h-[70vh] w-full bg-black"
+                        />
+                      ) : (
+                        <audio
+                          key={item.id}
+                          src={playableUrl(item.blobUrl)}
+                          controls
+                          autoPlay
+                          className="w-full px-3 py-4"
+                        />
+                      )}
+                    </div>
+                  )}
+
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--forest)]/10 pt-4">
+                  {(item.kind === "video" || item.kind === "audio") && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPlayingId((id) =>
+                          id === item.id ? null : item.id,
+                        )
+                      }
+                      className="inline-flex min-h-9 items-center rounded-full border border-[var(--forest)]/15 px-4 text-sm text-[var(--cream)]/75"
+                    >
+                      {playingId === item.id ? "Hide player" : "Watch"}
+                    </button>
+                  )}
                   <a
-                    href={`/api/media/stream?url=${encodeURIComponent(item.blobUrl)}`}
+                    href={
+                      item.kind === "video"
+                        ? playbackSrc({
+                            playbackUrl: item.playbackUrl,
+                            blobUrl: item.blobUrl,
+                          })
+                        : playableUrl(item.blobUrl)
+                    }
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex min-h-9 items-center rounded-full border border-[var(--forest)]/15 px-4 text-sm text-[var(--cream)]/75"
