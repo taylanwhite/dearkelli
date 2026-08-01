@@ -1,19 +1,26 @@
 @import "tailwindcss";
 
 :root {
-  /* Retro 70s: white, gold, forest green */
-  --ground: #fffdf8;
-  --surface: #fff6e4;
-  --gold: #c9a227;
-  --gold-deep: #a8841a;
-  --forest: #2c5a45;
-  --forest-deep: #1e3d30;
-  --blush: #2c5a45; /* secondary accent = forest (keeps existing var names working) */
-  --cream: #1e3d30; /* primary ink (kept name so existing text classes work) */
-  --muted: #5a7266;
-  --line: rgba(30, 61, 48, 0.12);
+  /* Soft keepsake: quiet paper, slate ink, dusty rose */
+  --ground: #f7f5f3;
+  --surface: #efeceb;
+  --ink: #3a3532;
+  --muted: #7a726c;
+  --rose: #b0897a;
+  --rose-deep: #8f6b5d;
+  --sage: #5f6e66;
+  --sage-deep: #46524c;
+  --line: rgba(58, 53, 50, 0.1);
+
+  /* Legacy names used across components */
+  --cream: var(--ink);
+  --gold: var(--rose);
+  --gold-deep: var(--rose-deep);
+  --forest: var(--sage);
+  --forest-deep: var(--sage-deep);
+  --blush: var(--rose);
   --background: var(--ground);
-  --foreground: var(--cream);
+  --foreground: var(--ink);
 }
 
 @theme inline {
@@ -33,23 +40,25 @@
 
 html {
   color-scheme: light;
+  overflow-x: clip;
 }
 
 body {
   background:
-    radial-gradient(ellipse 90% 55% at 50% -10%, rgba(201, 162, 39, 0.22), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(44, 90, 69, 0.1), transparent 50%),
-    radial-gradient(ellipse 50% 35% at 0% 80%, rgba(201, 162, 39, 0.1), transparent 45%),
+    radial-gradient(ellipse 80% 50% at 50% -15%, rgba(176, 137, 122, 0.12), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 100%, rgba(95, 110, 102, 0.06), transparent 50%),
     var(--ground);
-  background-attachment: fixed;
-  color: var(--cream);
+  color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
   min-height: 100dvh;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--gold) 55%, white);
-  color: var(--forest-deep);
+  background: color-mix(in oklab, var(--rose) 40%, white);
+  color: var(--ink);
 }
 
 a {

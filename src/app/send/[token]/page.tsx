@@ -25,8 +25,8 @@ export default async function SendPage({ params }: Props) {
   const isGeneric = contributor.inviteToken.startsWith("open-");
 
   return (
-    <main className="min-h-dvh bg-[var(--ground)]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.22),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(44,90,69,0.1),_transparent_50%)]" />
+    <main className="min-h-dvh bg-[var(--ground)] pt-[env(safe-area-inset-top)]">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(176,137,122,0.16),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(95,110,102,0.08),_transparent_50%)]" />
       <div className="relative">
         <SendForm
           contributor={{

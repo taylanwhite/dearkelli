@@ -14,15 +14,15 @@ export function SiteNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky top-0 z-40 border-b border-[var(--forest)]/10 bg-[var(--ground)]/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
+    <nav className="sticky top-0 z-40 border-b border-[var(--line)] bg-[var(--ground)]/85 backdrop-blur-md pt-[env(safe-area-inset-top)]">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2 sm:px-5 sm:py-3">
         <Link
           href="/"
-          className="font-[family-name:var(--font-display)] text-lg tracking-tight text-[var(--gold-deep)]"
+          className="flex min-h-11 items-center font-[family-name:var(--font-display)] text-xl tracking-tight text-[var(--ink)]"
         >
           Kelli
         </Link>
-        <ul className="flex items-center gap-1 sm:gap-2">
+        <ul className="flex items-center gap-0.5 sm:gap-1">
           {LINKS.map((link) => {
             const active =
               link.href === "/"
@@ -32,10 +32,10 @@ export function SiteNav() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className={`rounded-full px-3 py-1.5 text-sm transition ${
+                  className={`flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm transition touch-manipulation sm:px-3.5 ${
                     active
-                      ? "bg-[var(--forest)] text-[var(--ground)]"
-                      : "text-[var(--cream)]/55 hover:text-[var(--forest)]"
+                      ? "bg-[var(--ink)] text-[var(--ground)]"
+                      : "text-[var(--muted)] active:text-[var(--ink)] hover:text-[var(--ink)]"
                   }`}
                 >
                   {link.label}

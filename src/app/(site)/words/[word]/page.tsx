@@ -44,7 +44,7 @@ export default async function WordPage({ params, searchParams }: Props) {
         >
           ← All the words
         </Link>
-        <h1 className="mt-6 font-[family-name:var(--font-display)] text-5xl text-[var(--gold-deep)] sm:text-6xl">
+        <h1 className="mt-6 break-words font-[family-name:var(--font-display)] text-4xl text-[var(--gold-deep)] sm:text-6xl">
           {word}
         </h1>
       </div>

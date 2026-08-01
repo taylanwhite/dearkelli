@@ -179,8 +179,8 @@ export function GatherBoard({ token, initialPeople }: Props) {
                       {person.uploadCount === 0
                         ? "Nothing sent yet"
                         : person.uploadCount === 1
-                          ? "1 thing sent"
-                          : `${person.uploadCount} things sent`}
+                          ? "1 memory sent"
+                          : `${person.uploadCount} memories sent`}
                     </p>
                   </div>
                   <button

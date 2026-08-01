@@ -157,6 +157,129 @@ export const THEME_TAGS = [
 
 export type ThemeTag = (typeof THEME_TAGS)[number];
 
+/** Cold / mundane / negative words we never want AI to push into her cloud. */
+const AI_TAG_BLOCKLIST = new Set([
+  "photo",
+  "picture",
+  "image",
+  "selfie",
+  "portrait",
+  "background",
+  "indoor",
+  "outdoor",
+  "inside",
+  "outside",
+  "person",
+  "people",
+  "man",
+  "woman",
+  "girl",
+  "boy",
+  "adult",
+  "child",
+  "shirt",
+  "pants",
+  "dress",
+  "hat",
+  "shoe",
+  "shoes",
+  "room",
+  "table",
+  "chair",
+  "wall",
+  "floor",
+  "ceiling",
+  "sky",
+  "tree",
+  "trees",
+  "car",
+  "phone",
+  "camera",
+  "video",
+  "audio",
+  "recording",
+  "clip",
+  "file",
+  "object",
+  "thing",
+  "stuff",
+  "color",
+  "black",
+  "white",
+  "gray",
+  "grey",
+  "blue",
+  "red",
+  "green",
+  "yellow",
+  "sitting",
+  "standing",
+  "looking",
+  "holding",
+  "wearing",
+  "sad",
+  "angry",
+  "hate",
+  "hated",
+  "death",
+  "dead",
+  "die",
+  "dying",
+  "cry",
+  "crying",
+  "tears",
+  "pain",
+  "hurt",
+  "hurting",
+  "lonely",
+  "alone",
+  "afraid",
+  "scared",
+  "worried",
+  "anxiety",
+  "fear",
+  "regret",
+  "sorry",
+  "apology",
+  "fight",
+  "fighting",
+  "broken",
+  "loss",
+  "sick",
+  "illness",
+  "funeral",
+  "grief",
+]);
+
+/**
+ * Keep only AI tags that feel happy, loving, or meaningful for her cloud.
+ * Spoken transcript words are not filtered through this.
+ */
+export function filterWarmAiTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const raw of tags) {
+    const cleaned = raw
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, "");
+    if (cleaned.length < 3 || cleaned.length > 18) continue;
+    if (AI_TAG_BLOCKLIST.has(cleaned)) continue;
+    if (STOPWORDS.has(cleaned) && !ALLOWLIST.has(cleaned)) continue;
+
+    const normalized = normalizeWord(cleaned) || cleaned;
+    if (AI_TAG_BLOCKLIST.has(normalized)) continue;
+    if (seen.has(normalized)) continue;
+
+    seen.add(normalized);
+    out.push(normalized);
+    if (out.length >= 12) break;
+  }
+
+  return out;
+}
+
 export const PHRASE_PATTERNS: string[][] = [
   ["i", "love", "you"],
   ["love", "you"],

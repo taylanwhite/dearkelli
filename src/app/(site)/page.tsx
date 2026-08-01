@@ -18,11 +18,13 @@ export default async function HomePage() {
         text: p.text,
         count: p.totalCount * 3,
         href: `/words/${encodeURIComponent(p.text)}?type=phrase`,
+        kind: "phrase" as const,
       })),
     ...wordStats.slice(0, 80).map((w) => ({
       text: w.normalized,
       count: w.totalCount,
       href: `/words/${encodeURIComponent(w.normalized)}`,
+      kind: "word" as const,
     })),
   ];
 
@@ -35,7 +37,7 @@ export default async function HomePage() {
   });
 
   return (
-    <main className="pb-10 pt-4">
+    <main className="pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-4">
       <WordCloud words={unique} />
     </main>
   );

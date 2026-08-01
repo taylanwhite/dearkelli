@@ -1,7 +1,7 @@
 "use client";
 
 import cloud from "d3-cloud";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   trackOrphanAudio,
@@ -12,6 +12,7 @@ export type CloudWord = {
   text: string;
   count: number;
   href: string;
+  kind?: "word" | "phrase";
 };
 
 type LayoutWord = CloudWord & {
@@ -33,21 +34,37 @@ function weightForCount(count: number, min: number, max: number) {
 }
 
 function sizeForCount(count: number, min: number, max: number, width: number) {
-  const base = Math.min(width / 18, 56);
-  const floor = Math.max(14, width / 48);
+  const base = Math.min(width / 16, 52);
+  const floor = Math.max(17, width / 36);
   if (max === min) return base;
   const t = Math.sqrt((count - min) / (max - min));
   return floor + t * (base - floor);
 }
 
+function wordFill(index: number, active: boolean) {
+  if (active) return "var(--rose-deep)";
+  if (index % 5 === 0) return "var(--rose)";
+  if (index % 3 === 0) return "var(--sage)";
+  return "var(--ink)";
+}
+
+function hitBox(word: LayoutWord) {
+  const height = Math.max(44, word.size * 1.55);
+  const width = Math.max(48, word.text.length * word.size * 0.58);
+  return { width, height };
+}
+
 export function WordCloud({ words }: Props) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [size, setSize] = useState({ width: 800, height: 560 });
+  const coarseRef = useRef(false);
+  const [size, setSize] = useState({ width: 360, height: 480 });
   const [laidOut, setLaidOut] = useState<LayoutWord[]>([]);
   const [ready, setReady] = useState(false);
-  const [hovered, setHovered] = useState<string | null>(null);
+  const [active, setActive] = useState<string | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [hint, setHint] = useState(false);
 
   const counts = useMemo(() => {
     const values = words.map((w) => w.count);
@@ -58,6 +75,9 @@ export function WordCloud({ words }: Props) {
   }, [words]);
 
   useEffect(() => {
+    coarseRef.current = window.matchMedia("(pointer: coarse)").matches;
+    if (coarseRef.current) setHint(true);
+
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     setReducedMotion(mq.matches);
     const onChange = () => setReducedMotion(mq.matches);
@@ -73,7 +93,7 @@ export function WordCloud({ words }: Props) {
       const rect = el.getBoundingClientRect();
       setSize({
         width: Math.max(320, Math.floor(rect.width)),
-        height: Math.max(420, Math.floor(window.innerHeight * 0.72)),
+        height: Math.max(400, Math.floor(window.innerHeight * 0.68)),
       });
     };
 
@@ -113,7 +133,7 @@ export function WordCloud({ words }: Props) {
     cloud<CloudInput>()
       .size([size.width, size.height])
       .words(input)
-      .padding(6)
+      .padding(10)
       .rotate(() => 0)
       .font("Fraunces, Georgia, serif")
       .fontSize((d) => d.size)
@@ -127,6 +147,7 @@ export function WordCloud({ words }: Props) {
             text: d.text,
             count: d.count,
             href: d.href,
+            kind: d.kind,
             x: d.x!,
             y: d.y!,
             size: d.size,
@@ -154,22 +175,32 @@ export function WordCloud({ words }: Props) {
     };
   }, []);
 
-  async function playSnippet(word: string) {
+  function stopSnippet() {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      untrackOrphanAudio(audioRef.current);
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+  }
+
+  async function playSnippet(word: CloudWord) {
     try {
-      const res = await fetch(`/api/snippet?word=${encodeURIComponent(word)}`);
+      const type =
+        word.kind ?? (word.text.includes(" ") ? "phrase" : "word");
+      const res = await fetch(
+        `/api/snippet?word=${encodeURIComponent(word.text)}&type=${type}`,
+      );
       if (!res.ok) return;
       const data = (await res.json()) as {
-        blobUrl: string;
-        startMs: number;
-        endMs: number;
+        blobUrl?: string;
+        startMs?: number;
+        endMs?: number;
+        snippet?: null;
       };
+      if (!data.blobUrl || data.startMs == null || data.endMs == null) return;
 
-      if (audioRef.current) {
-        audioRef.current.pause();
-        untrackOrphanAudio(audioRef.current);
-        audioRef.current.src = "";
-        audioRef.current = null;
-      }
+      stopSnippet();
 
       const audio = new Audio(data.blobUrl);
       audioRef.current = audio;
@@ -180,23 +211,43 @@ export function WordCloud({ words }: Props) {
       audio.currentTime = start;
       await audio.play();
 
-      const stop = () => {
+      const onTime = () => {
         if (audio.currentTime >= end) {
           audio.pause();
           untrackOrphanAudio(audio);
-          audio.removeEventListener("timeupdate", stop);
+          audio.removeEventListener("timeupdate", onTime);
         }
       };
-      audio.addEventListener("timeupdate", stop);
+      audio.addEventListener("timeupdate", onTime);
     } catch {
       // Snippet playback is optional atmosphere; ignore failures.
     }
   }
 
+  function activateWord(word: LayoutWord) {
+    setActive(word.text);
+    setHint(false);
+    void playSnippet(word);
+  }
+
+  function handleWordActivate(word: LayoutWord) {
+    if (coarseRef.current) {
+      // First tap: hear it. Second tap on the same word: open the supercut.
+      if (active === word.text) {
+        stopSnippet();
+        router.push(word.href);
+        return;
+      }
+      activateWord(word);
+      return;
+    }
+    router.push(word.href);
+  }
+
   if (words.length === 0) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center px-6 text-center">
-        <p className="max-w-sm font-[family-name:var(--font-display)] text-2xl text-[var(--cream)]/70">
+        <p className="max-w-sm font-[family-name:var(--font-display)] text-2xl text-[var(--muted)]">
           Your people are still finding their words.
         </p>
       </div>
@@ -205,11 +256,16 @@ export function WordCloud({ words }: Props) {
 
   return (
     <div ref={containerRef} className="relative w-full overflow-hidden">
+      {hint && (
+        <p className="pointer-events-none absolute left-0 right-0 top-2 z-10 px-5 text-center text-sm text-[var(--muted)]">
+          Tap a word to hear it. Tap again to open it.
+        </p>
+      )}
       <svg
         width={size.width}
         height={size.height}
         viewBox={`0 0 ${size.width} ${size.height}`}
-        className="mx-auto block"
+        className="mx-auto block touch-manipulation"
         role="img"
         aria-label="Words people have said about you"
       >
@@ -222,56 +278,74 @@ export function WordCloud({ words }: Props) {
             const fromY = reducedMotion
               ? word.y
               : word.y + (word.y >= 0 ? 1 : -1) * (60 + (index % 7) * 18);
+            const isActive = active === word.text;
+            const box = hitBox(word);
 
             return (
-              <g key={word.text}>
-                <Link
-                  href={word.href}
-                  onMouseEnter={() => {
-                    setHovered(word.text);
-                    void playSnippet(word.text);
+              <g
+                key={word.text}
+                role="link"
+                tabIndex={0}
+                aria-label={word.text}
+                onClick={() => handleWordActivate(word)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleWordActivate(word);
+                  }
+                }}
+                onMouseEnter={() => {
+                  if (coarseRef.current) return;
+                  setActive(word.text);
+                  void playSnippet(word);
+                }}
+                onMouseLeave={() => {
+                  if (coarseRef.current) return;
+                  setActive(null);
+                  stopSnippet();
+                }}
+                onFocus={() => setActive(word.text)}
+                style={{ cursor: "pointer" }}
+              >
+                <g
+                  style={{
+                    opacity: ready
+                      ? active && !isActive
+                        ? 0.35
+                        : 0.9
+                      : 0,
+                    transform: ready
+                      ? `translate(${word.x}px, ${word.y}px) scale(${
+                          isActive ? 1.06 : 1
+                        })`
+                      : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
+                    transition: reducedMotion
+                      ? "opacity 0.6s ease"
+                      : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s`,
                   }}
-                  onMouseLeave={() => {
-                    setHovered(null);
-                    if (audioRef.current) {
-                      audioRef.current.pause();
-                      audioRef.current = null;
-                    }
-                  }}
-                  onFocus={() => setHovered(word.text)}
-                  onBlur={() => setHovered(null)}
                 >
+                  <rect
+                    x={-box.width / 2}
+                    y={-box.height / 2}
+                    width={box.width}
+                    height={box.height}
+                    fill="transparent"
+                  />
                   <text
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fill={
-                      hovered === word.text
-                        ? "var(--gold-deep)"
-                        : index % 4 === 0
-                          ? "var(--gold)"
-                          : index % 3 === 0
-                            ? "var(--forest)"
-                            : "var(--forest-deep)"
-                    }
+                    fill={wordFill(index, isActive)}
                     fontFamily="var(--font-display), Georgia, serif"
                     fontSize={word.size}
                     fontWeight={word.weight}
                     style={{
-                      cursor: "pointer",
-                      opacity: ready ? (hovered && hovered !== word.text ? 0.45 : 0.92) : 0,
-                      transform: ready
-                        ? `translate(${word.x}px, ${word.y}px) scale(${
-                            hovered === word.text ? 1.08 : 1
-                          })`
-                        : `translate(${fromX}px, ${fromY}px) scale(0.92)`,
-                      transition: reducedMotion
-                        ? "opacity 0.6s ease"
-                        : `transform 1.2s cubic-bezier(0.22, 1, 0.36, 1) ${delay}s, opacity 0.8s ease ${delay}s, fill 0.2s ease`,
+                      transition: "fill 0.2s ease",
+                      pointerEvents: "none",
                     }}
                   >
                     {word.text}
                   </text>
-                </Link>
+                </g>
               </g>
             );
           })}

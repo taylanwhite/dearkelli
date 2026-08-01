@@ -20,9 +20,15 @@ import { BLOB_ACCESS } from "@/lib/blob";
 import {
   THEME_TAGS,
   detectPhrases,
+  filterWarmAiTags,
   normalizeWord,
   type TimedWord,
 } from "@/lib/words";
+
+const AI_TAG_GUIDANCE = `ONLY happy, loving, or deeply meaningful words she would want to see about herself.
+Feelings, virtues, warmth, relationship, belonging, joy. Never mundane objects, never neutral visual descriptors, never negative words.
+Good: love, laughter, home, brave, sister, always, sunshine, grateful, soft, forever, proud, gentle, family, heart, light
+Bad: table, shirt, outdoor, person, sad, phone, wall, crying`;
 
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY;
@@ -135,13 +141,13 @@ async function enrichFromText(openai: OpenAI, fullText: string) {
     messages: [
       {
         role: "system",
-        content: `You label birthday messages about Kelli.
+        content: `You label loving messages about Kelli for a keepsake word cloud.
 Return JSON:
 {
   "title": string (max 6 words, warm),
-  "summary": string (1-2 sentences),
+  "summary": string (1-2 sentences, tender),
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 single evocative words for a word cloud; nouns/adjectives/verbs she would feel, lowercase, no stopwords)
+  "tags": string[] (5-12 lowercase single words for the word cloud. ${AI_TAG_GUIDANCE})
 }`,
       },
       { role: "user", content: fullText.slice(0, 6000) },
@@ -159,10 +165,7 @@ Return JSON:
     const themes = (parsed.themes || []).filter((t) =>
       (THEME_TAGS as readonly string[]).includes(t),
     );
-    const tags = (parsed.tags || [])
-      .map((t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""))
-      .filter((t) => t.length >= 2)
-      .slice(0, 12);
+    const tags = filterWarmAiTags(parsed.tags || []);
     return {
       title: parsed.title?.slice(0, 80) || "A message for Kelli",
       summary: parsed.summary?.slice(0, 400) || null,
@@ -195,13 +198,13 @@ async function enrichImage(
         content: [
           {
             type: "text",
-            text: `This photo is for Kelli's birthday scrapbook.
+            text: `This photo is a keepsake for Kelli. Look for love, warmth, and meaning, not a catalog of objects.
 Return JSON:
 {
-  "title": string (max 6 words),
-  "caption": string (one warm sentence),
+  "title": string (max 6 words, warm),
+  "caption": string (one tender sentence about the feeling or bond, not a dry description),
   "themes": string[] (1-3 from: ${THEME_TAGS.join(", ")}),
-  "tags": string[] (5-12 lowercase single words describing people, places, feelings, objects, for a word cloud)
+  "tags": string[] (5-12 lowercase single words for the word cloud. ${AI_TAG_GUIDANCE})
 }`,
           },
           { type: "image_url", image_url: { url: dataUrl } },
@@ -221,10 +224,7 @@ Return JSON:
     const themes = (parsed.themes || []).filter((t) =>
       (THEME_TAGS as readonly string[]).includes(t),
     );
-    const tags = (parsed.tags || [])
-      .map((t) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ""))
-      .filter((t) => t.length >= 2)
-      .slice(0, 12);
+    const tags = filterWarmAiTags(parsed.tags || []);
     return {
       title: parsed.title?.slice(0, 80) || "A photo for Kelli",
       caption: parsed.caption?.slice(0, 400) || null,
@@ -310,27 +310,14 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
     })
     .returning();
 
-  const fromCaption = (captionText.match(/[\p{L}\p{N}']+/gu) || [])
-    .map((raw, i) => ({
-      raw,
-      normalized: normalizeWord(raw),
-      startMs: i * 10,
-      endMs: i * 10 + 5,
-    }))
-    .filter((w): w is TimedWord & { normalized: string } => !!w.normalized);
-
+  // Photos: only curated warm AI tags go into the cloud (not every caption noun).
   const fromTags = tagWordsFromList(enrichment.tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
 
-  const merged = new Map<string, TimedWord & { normalized: string }>();
-  for (const w of [...fromCaption, ...fromTags]) {
-    if (!merged.has(w.normalized)) merged.set(w.normalized, w);
-  }
-
-  if (merged.size > 0) {
+  if (fromTags.length > 0) {
     await db.insert(words).values(
-      [...merged.values()].map((w) => ({
+      fromTags.map((w) => ({
         transcriptId: transcriptRow.id,
         mediaId: item.id,
         contributorId: item.contributorId,

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter_Tight } from "next/font/google";
+import { Fraunces, Source_Sans_3 } from "next/font/google";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -7,7 +7,7 @@ const fraunces = Fraunces({
   subsets: ["latin"],
 });
 
-const interTight = Inter_Tight({
+const sourceSans = Source_Sans_3({
   variable: "--font-body",
   subsets: ["latin"],
 });
@@ -19,9 +19,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fffdf8",
+  themeColor: "#f7f5f3",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${fraunces.variable} ${interTight.variable} antialiased`}
+        className={`${fraunces.variable} ${sourceSans.variable} antialiased`}
       >
         {children}
       </body>
