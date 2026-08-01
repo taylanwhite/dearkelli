@@ -13,6 +13,7 @@ export type UploadItem = {
   previewUrl: string;
   originalFilename: string | null;
   title: string | null;
+  summary: string | null;
   isAvatar: boolean;
 };
 
@@ -26,6 +27,89 @@ function labelFor(item: UploadItem) {
   if (item.kind === "image") return item.isAvatar ? "Your photo" : "Photo";
   if (item.kind === "video") return "Video";
   return "Voice";
+}
+
+function AttachmentNote({
+  token,
+  item,
+  onSaved,
+}: {
+  token: string;
+  item: UploadItem;
+  onSaved: (id: string, summary: string | null) => void;
+}) {
+  const [draft, setDraft] = useState(item.summary ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraft(item.summary ?? "");
+  }, [item.id, item.summary]);
+
+  const dirty = draft.trim() !== (item.summary ?? "").trim();
+
+  async function save() {
+    if (!dirty || saving) return;
+    setSaving(true);
+    setError(null);
+    const next = draft.trim() ? draft.trim().slice(0, 280) : null;
+    try {
+      const res = await fetch(`/api/contributor/${token}/media/${item.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary: next }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error || "Couldn't save that note");
+      }
+      onSaved(item.id, next);
+      setDraft(next ?? "");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save that note");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="border-t border-[var(--cream)]/10 bg-[var(--surface)] px-3 py-2.5">
+      <label className="block">
+        <span className="text-[11px] uppercase tracking-wide text-[var(--cream)]/45">
+          Note (optional)
+        </span>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value.slice(0, 280))}
+          onBlur={() => void save()}
+          rows={2}
+          maxLength={280}
+          placeholder="A quick note for Kelli…"
+          className="mt-1.5 w-full resize-none rounded-xl border border-[var(--cream)]/15 bg-[var(--ground)] px-2.5 py-2 text-sm leading-snug text-[var(--cream)] placeholder:text-[var(--cream)]/35 focus:border-[var(--cream)]/35 focus:outline-none"
+        />
+      </label>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="text-[11px] text-[var(--cream)]/35">
+          {draft.length}/280
+        </span>
+        {dirty ? (
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={saving}
+            className="text-[11px] font-medium text-[var(--gold)] disabled:opacity-50"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        ) : item.summary ? (
+          <span className="text-[11px] text-[var(--cream)]/40">Saved</span>
+        ) : null}
+      </div>
+      {error ? (
+        <p className="mt-1 text-[11px] text-[var(--blush)]">{error}</p>
+      ) : null}
+    </div>
+  );
 }
 
 export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
@@ -63,8 +147,8 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
         .map((item) => ({
           id: item.id,
           src: item.previewUrl,
-          alt: item.title || item.originalFilename || "Photo",
-          caption: item.title,
+          alt: item.summary || item.originalFilename || "Photo",
+          caption: item.summary,
         })),
     [items],
   );
@@ -107,7 +191,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
           What you&apos;ve sent
         </p>
         <p className="mt-1 text-sm text-[var(--cream)]/55">
-          Tap a photo to see it bigger.
+          Add an optional note on photos and videos.
         </p>
       </div>
 
@@ -115,7 +199,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
         <p className="text-center text-sm text-[var(--blush)]">{error}</p>
       )}
 
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((item) => {
           const galleryIndex = imageGallery.findIndex((p) => p.id === item.id);
           return (
@@ -136,7 +220,7 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.previewUrl}
-                      alt={item.title || item.originalFilename || "Photo"}
+                      alt={item.summary || item.originalFilename || "Photo"}
                       className="h-full w-full object-cover"
                     />
                   </button>
@@ -172,6 +256,19 @@ export function MyUploads({ token, refreshKey = 0, onAvatarCleared }: Props) {
                   {removingId === item.id ? "…" : "Remove"}
                 </button>
               </div>
+              {item.kind !== "audio" && (
+                <AttachmentNote
+                  token={token}
+                  item={item}
+                  onSaved={(id, summary) =>
+                    setItems((prev) =>
+                      prev.map((row) =>
+                        row.id === id ? { ...row, summary } : row,
+                      ),
+                    )
+                  }
+                />
+              )}
             </li>
           );
         })}

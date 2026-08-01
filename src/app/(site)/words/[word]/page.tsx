@@ -1,3 +1,4 @@
+import { notFound } from "next/navigation";
 import { Supercut } from "@/components/Supercut";
 import { playbackSrc, playableUrl } from "@/lib/blob";
 import { getPhraseOccurrences, getWordOccurrences } from "@/lib/queries";
@@ -38,6 +39,10 @@ export default async function WordPage({ params, searchParams }: Props) {
       avatarUrl: r.avatarUrl,
       title: r.title,
     }));
+
+  if (clips.length === 0) {
+    notFound();
+  }
 
   return (
     <main className="pt-8">

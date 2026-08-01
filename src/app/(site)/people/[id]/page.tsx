@@ -62,8 +62,8 @@ export default async function PersonPage({ params }: Props) {
           poster: clip.posterUrl ? playableUrl(clip.posterUrl) : undefined,
           title: clip.title,
           summary: clip.summary,
-          caption: clip.caption,
-          alt: clip.caption || clip.title || `From ${person.name}`,
+          caption: clip.summary || clip.caption,
+          alt: clip.summary || clip.caption || `From ${person.name}`,
         }))}
       />
     </main>

@@ -160,8 +160,8 @@ export function VoiceRecorder({ token, onSent }: Props) {
     const blob = blobRef.current;
     if (!blob) return;
 
-    if (isOverUploadLimit(blob.size)) {
-      setError(uploadLimitMessage("Your recording"));
+    if (isOverUploadLimit(blob.size, "audio")) {
+      setError(uploadLimitMessage("Your recording", "audio"));
       setPhase("error");
       return;
     }

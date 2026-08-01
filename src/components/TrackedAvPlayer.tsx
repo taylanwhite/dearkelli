@@ -16,7 +16,6 @@ export function TrackedAvPlayer({
   kind,
   src,
   poster,
-  title,
   summary,
 }: Props) {
   return (
@@ -41,9 +40,9 @@ export function TrackedAvPlayer({
           />
         </div>
       )}
-      {(title || summary) && (
+      {(summary) && (
         <p className="mt-2 font-[family-name:var(--font-display)] text-base leading-snug text-[var(--forest-deep)]">
-          {summary || title}
+          {summary}
         </p>
       )}
     </article>

@@ -19,7 +19,7 @@ export async function getWordStats() {
     })
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
-    .where(eq(media.status, "ready"))
+    .where(and(eq(media.status, "ready"), eq(words.source, "speech")))
     .groupBy(words.normalized)
     .orderBy(desc(sql`count(*)`));
 
@@ -140,6 +140,7 @@ export async function getPerson(id: string) {
   const topWordConditions = [
     eq(words.contributorId, id),
     eq(media.status, "ready"),
+    eq(words.source, "speech"),
     isNull(media.processingError),
   ];
   if (person.avatarUrl) {
@@ -183,6 +184,7 @@ export async function getPhotos(contributorId?: string) {
       blobUrl: media.blobUrl,
       posterUrl: media.posterUrl,
       caption: media.caption,
+      summary: media.summary,
       title: media.title,
       contributorId: contributors.id,
       contributorName: contributors.name,
@@ -215,6 +217,7 @@ export async function searchAll(query: string) {
         .where(
           and(
             eq(media.status, "ready"),
+            eq(words.source, "speech"),
             or(ilike(words.normalized, pattern), ilike(words.raw, pattern)),
           ),
         )

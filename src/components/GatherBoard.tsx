@@ -41,7 +41,7 @@ export function GatherBoard({ token, initialPeople }: Props) {
   async function addPerson(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
-      setError("Add their name so the link knows who it's for.");
+      setError("Add their name.");
       return;
     }
 
@@ -172,9 +172,6 @@ export function GatherBoard({ token, initialPeople }: Props) {
                         {person.relationship}
                       </p>
                     )}
-                    <p className="mt-1 truncate text-xs text-[var(--cream)]/35">
-                      /send/{person.inviteToken}
-                    </p>
                     <p className="mt-2 text-xs text-[var(--cream)]/40">
                       {person.uploadCount === 0
                         ? "Nothing sent yet"

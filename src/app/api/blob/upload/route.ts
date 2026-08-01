@@ -6,7 +6,7 @@ import { contributors } from "@/db/schema";
 import { ensureMediaRecord } from "@/lib/ensure-media";
 import {
   ALLOWED_CONTENT_TYPES,
-  MAX_UPLOAD_BYTES,
+  maxUploadBytesForKind,
   kindFromMime,
 } from "@/lib/media";
 
@@ -66,7 +66,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         return {
           allowedContentTypes: ALLOWED_CONTENT_TYPES,
           addRandomSuffix: true,
-          maximumSizeInBytes: MAX_UPLOAD_BYTES,
+          maximumSizeInBytes: maxUploadBytesForKind(kind),
           tokenPayload: JSON.stringify(payload),
         };
       },

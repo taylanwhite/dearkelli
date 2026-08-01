@@ -68,10 +68,10 @@ export default async function PhotosPage({ searchParams }: Props) {
               id: photo.id,
               src: playableUrl(photo.posterUrl || photo.blobUrl),
               alt:
+                photo.summary ||
                 photo.caption ||
-                photo.title ||
                 `From ${photo.contributorName}`,
-              caption: photo.caption || photo.title,
+              caption: photo.summary || photo.caption || undefined,
               contributorId: photo.contributorId,
               contributorName: photo.contributorName,
               avatarUrl: photo.avatarUrl,

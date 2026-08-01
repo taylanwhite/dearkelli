@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
-import { get, put } from "@vercel/blob";
+import { del, get, put } from "@vercel/blob";
 import { eq } from "drizzle-orm";
 import OpenAI from "openai";
 import sharp from "sharp";
@@ -81,6 +81,19 @@ const PROCESSED_PUT = {
   // hold them a full year so we don't re-pay origin transfer on every view.
   cacheControlMaxAge: 60 * 60 * 24 * 365,
 };
+
+/** Drop the fat original once we have a compressed replacement. */
+async function discardOriginalBlob(
+  originalUrl: string,
+  replacementUrl: string | null | undefined,
+) {
+  if (!replacementUrl || replacementUrl === originalUrl) return;
+  try {
+    await del(originalUrl);
+  } catch (err) {
+    console.warn("Failed to delete original blob", err);
+  }
+}
 
 type AudioMapMode =
   | { kind: "index"; index: number }
@@ -663,6 +676,8 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
     );
   }
 
+  const originalUrl = item.blobUrl;
+
   await db
     .update(media)
     .set({
@@ -670,15 +685,15 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
       posterUrl: thumbBlob.url,
       width: meta.width ?? null,
       height: meta.height ?? null,
-      caption: enrichment.caption,
-      title: enrichment.title,
-      summary: enrichment.caption,
+      // Leave summary/caption/title alone — those are contributor notes only.
       themes,
       tags: tags.length ? tags : null,
       status: "ready",
       processingError: null,
     })
     .where(eq(media.id, item.id));
+
+  await discardOriginalBlob(originalUrl, jpegBlob.url);
 }
 
 async function markVisibleWithoutAi(
@@ -690,6 +705,13 @@ async function markVisibleWithoutAi(
     playbackUrl?: string | null;
   },
 ) {
+  const playbackUrl = opts.playbackUrl ?? item.playbackUrl;
+  // Prefer the compressed web file as the canonical blob once we have it.
+  const blobUrl =
+    item.kind === "video" && playbackUrl && playbackUrl !== item.blobUrl
+      ? playbackUrl
+      : item.blobUrl;
+
   await db
     .update(media)
     .set({
@@ -699,16 +721,15 @@ async function markVisibleWithoutAi(
         ? Math.round(opts.duration)
         : item.durationSeconds,
       posterUrl: opts.posterUrl ?? item.posterUrl,
-      playbackUrl: opts.playbackUrl ?? item.playbackUrl,
+      playbackUrl,
+      blobUrl,
       title:
         item.title ||
-        (item.kind === "audio"
-          ? "A voice for Kelli"
-          : item.kind === "image"
-            ? "A photo for Kelli"
-            : "A message for Kelli"),
+        (item.kind === "audio" ? "A voice for Kelli" : item.title),
     })
     .where(eq(media.id, item.id));
+
+  await discardOriginalBlob(item.blobUrl, blobUrl);
 }
 
 async function processAv(item: Media, workDir: string, openai: OpenAI) {
@@ -754,7 +775,16 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     if (item.kind === "video") {
       try {
         await extractPoster(ffmpeg, sourcePath, posterPath);
-        const posterBuf = await readFile(posterPath);
+        const posterRaw = await readFile(posterPath);
+        const posterBuf = await sharp(posterRaw)
+          .resize({
+            width: 1280,
+            height: 1280,
+            fit: "inside",
+            withoutEnlargement: true,
+          })
+          .jpeg({ quality: 72, mozjpeg: true })
+          .toBuffer();
         const posterBlob = await put(
           `processed/${item.id}/poster.jpg`,
           posterBuf,
@@ -951,6 +981,11 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     );
   }
 
+  const blobUrl =
+    item.kind === "video" && playbackUrl && playbackUrl !== item.blobUrl
+      ? playbackUrl
+      : item.blobUrl;
+
   await db
     .update(media)
     .set({
@@ -959,12 +994,14 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       durationSeconds: duration ? Math.round(duration) : item.durationSeconds,
       posterUrl,
       playbackUrl,
-      title: enrichment.title,
-      summary: enrichment.summary,
+      blobUrl,
+      // Leave summary/title alone — contributor notes only (audio has none).
       themes,
       tags: tags.length ? tags : null,
     })
     .where(eq(media.id, item.id));
+
+  await discardOriginalBlob(item.blobUrl, blobUrl);
 }
 
 export async function processMediaById(id: string): Promise<{

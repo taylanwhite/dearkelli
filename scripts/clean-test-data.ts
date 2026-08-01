@@ -14,7 +14,9 @@ export async function cleanTestData() {
   const urls = [
     ...new Set(
       testMedia.flatMap((row) =>
-        [row.blobUrl, row.posterUrl].filter((u): u is string => !!u),
+        [row.blobUrl, row.posterUrl, row.playbackUrl].filter(
+          (u): u is string => !!u,
+        ),
       ),
     ),
   ];

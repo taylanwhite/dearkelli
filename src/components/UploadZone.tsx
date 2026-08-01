@@ -3,7 +3,6 @@
 import { upload } from "@vercel/blob/client";
 import { useCallback, useRef, useState } from "react";
 import {
-  MAX_UPLOAD_LABEL,
   isOverUploadLimit,
   uploadLimitMessage,
 } from "@/lib/media";
@@ -205,13 +204,14 @@ export function UploadZone({ token, onAllSettled }: Props) {
       if (list.length === 0) return;
 
       const tracked: TrackedFile[] = list.map((file) => {
-        const over = isOverUploadLimit(file.size);
+        const kind = kindFromFile(file);
+        const over = isOverUploadLimit(file.size, kind);
         return {
           id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
           file,
           progress: over ? 100 : 0,
           status: over ? ("error" as const) : ("queued" as const),
-          error: over ? uploadLimitMessage(file.name) : undefined,
+          error: over ? uploadLimitMessage(file.name, kind) : undefined,
         };
       });
 
@@ -292,7 +292,7 @@ export function UploadZone({ token, onAllSettled }: Props) {
             Drop a video, voice memo, or photo
           </p>
           <p className="mt-2 text-sm text-[var(--cream)]/55">
-            Or tap to choose from your phone. Up to {MAX_UPLOAD_LABEL} each.
+            Or tap to choose from your phone.
           </p>
           <input
             ref={inputRef}

@@ -47,20 +47,65 @@ export const ALLOWED_CONTENT_TYPES = [
   ...IMAGE_TYPES,
 ];
 
-/** Hard cap for contributor uploads (Blob token + client checks). */
-export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // 1 GB
+/** Hard caps for contributor uploads (Blob token + client checks). */
+export const MAX_IMAGE_BYTES = 25 * 1024 * 1024; // 25 MB
+export const MAX_AUDIO_BYTES = 40 * 1024 * 1024; // 40 MB
+export const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB — compressed after upload
 
-export const MAX_UPLOAD_LABEL = "1 GB";
+/** Largest allowed upload (used where kind isn't known yet). */
+export const MAX_UPLOAD_BYTES = MAX_VIDEO_BYTES;
 
-export function isOverUploadLimit(size: number) {
-  return size > MAX_UPLOAD_BYTES;
+export const MAX_UPLOAD_LABEL = "200 MB for video · 25 MB for photos";
+
+export function maxUploadBytesForKind(
+  kind: "image" | "video" | "audio" | "other" | string,
+): number {
+  if (kind === "image") return MAX_IMAGE_BYTES;
+  if (kind === "audio") return MAX_AUDIO_BYTES;
+  if (kind === "video") return MAX_VIDEO_BYTES;
+  return MAX_UPLOAD_BYTES;
 }
 
-export function uploadLimitMessage(filename?: string) {
+export function uploadLimitLabelForKind(
+  kind: "image" | "video" | "audio" | "other" | string,
+): string {
+  if (kind === "image") return "25 MB";
+  if (kind === "audio") return "40 MB";
+  if (kind === "video") return "200 MB";
+  return MAX_UPLOAD_LABEL;
+}
+
+export function isOverUploadLimit(
+  size: number,
+  kind?: "image" | "video" | "audio" | "other" | string,
+) {
+  const max = kind ? maxUploadBytesForKind(kind) : MAX_UPLOAD_BYTES;
+  return size > max;
+}
+
+export function uploadLimitMessage(
+  filename?: string,
+  kind?: "image" | "video" | "audio" | "other" | string,
+) {
   const name = filename?.trim();
+  if (kind === "image") {
+    return name
+      ? `${name} is too large to send. Try a smaller photo.`
+      : "That photo is too large to send. Try a smaller one.";
+  }
+  if (kind === "video") {
+    return name
+      ? `${name} is too large to send. Try a shorter clip.`
+      : "That video is too large to send. Try a shorter clip.";
+  }
+  if (kind === "audio") {
+    return name
+      ? `${name} is too large to send.`
+      : "That recording is too large to send.";
+  }
   return name
-    ? `${name} is too large. The maximum is ${MAX_UPLOAD_LABEL}.`
-    : `That file is too large. The maximum is ${MAX_UPLOAD_LABEL}.`;
+    ? `${name} is too large to send.`
+    : "That file is too large to send.";
 }
 
 const VIDEO_EXTS = ["mp4", "mov", "webm", "m4v", "3gp", "3g2", "avi", "mpeg", "mpg"];

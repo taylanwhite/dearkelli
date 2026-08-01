@@ -142,7 +142,7 @@ export function PersonMedia({ personName, items }: Props) {
                   id: photo.id,
                   src: photo.src,
                   alt: photo.alt,
-                  caption: photo.caption || photo.title,
+                  caption: photo.summary || photo.caption || undefined,
                   contributorName: personName,
                 }))}
               />

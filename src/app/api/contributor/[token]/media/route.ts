@@ -37,6 +37,7 @@ export async function GET(_request: Request, { params }: Params) {
       originalFilename: media.originalFilename,
       title: media.title,
       caption: media.caption,
+      summary: media.summary,
       tags: media.tags,
       themes: media.themes,
       createdAt: media.createdAt,

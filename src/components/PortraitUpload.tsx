@@ -40,9 +40,9 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
   async function handleFile(file: File) {
     setError(null);
 
-    if (isOverUploadLimit(file.size)) {
+    if (isOverUploadLimit(file.size, "image")) {
       setStatus("error");
-      setError(uploadLimitMessage(file.name));
+      setError(uploadLimitMessage(file.name, "image"));
       return;
     }
 
@@ -89,8 +89,7 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
         A photo of you
       </p>
       <p className="mt-2 text-sm leading-relaxed text-[var(--cream)]/60">
-        Just your face, or you with her. She&apos;ll see it when she finds your
-        name among the words.
+        Just your face, or you with her — so she knows who this is from.
       </p>
 
       {previewSrc ? (
