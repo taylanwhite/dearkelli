@@ -12,6 +12,7 @@ type TokenPayload = {
   contributorId: string;
   kind: "video" | "audio" | "image";
   originalFilename: string;
+  purpose?: "avatar" | "media";
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -30,6 +31,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           token?: string;
           contentType?: string;
           filename?: string;
+          purpose?: "avatar" | "media";
         };
 
         if (!parsed.token) {
@@ -54,6 +56,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           contributorId: contributor.id,
           kind,
           originalFilename: filename,
+          purpose: parsed.purpose === "avatar" ? "avatar" : "media",
         };
 
         return {
@@ -70,6 +73,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         try {
           const payload = JSON.parse(tokenPayload) as TokenPayload;
+
+          // Profile portraits live on the contributor only, not in the album.
+          if (payload.purpose === "avatar") {
+            await db
+              .update(contributors)
+              .set({ avatarUrl: blob.url })
+              .where(eq(contributors.id, payload.contributorId));
+            return;
+          }
+
           const existing = await db
             .select({ id: media.id })
             .from(media)

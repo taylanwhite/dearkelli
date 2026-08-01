@@ -50,6 +50,7 @@ export const media = pgTable(
     title: text("title"),
     summary: text("summary"),
     themes: text("themes").array(),
+    tags: text("tags").array(),
     caption: text("caption"),
     originalFilename: text("original_filename"),
     isTest: boolean("is_test").notNull().default(false),
@@ -91,11 +92,14 @@ export const words = pgTable(
     normalized: text("normalized").notNull(),
     startMs: integer("start_ms").notNull(),
     endMs: integer("end_ms").notNull(),
+    /** speech = from transcript; tag = AI or human word-cloud tags */
+    source: text("source").notNull().default("speech"),
   },
   (table) => [
     index("words_normalized_idx").on(table.normalized),
     index("words_contributor_id_idx").on(table.contributorId),
     index("words_media_id_idx").on(table.mediaId),
+    index("words_source_idx").on(table.source),
   ],
 );
 

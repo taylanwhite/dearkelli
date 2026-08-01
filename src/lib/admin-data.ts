@@ -112,6 +112,7 @@ export async function getAdminMedia() {
       originalFilename: media.originalFilename,
       durationSeconds: media.durationSeconds,
       themes: media.themes,
+      tags: media.tags,
       caption: media.caption,
       isTest: media.isTest,
       createdAt: media.createdAt,

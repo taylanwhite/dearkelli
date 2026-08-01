@@ -36,6 +36,9 @@ export async function GET(_request: Request, { params }: Params) {
       posterUrl: media.posterUrl,
       originalFilename: media.originalFilename,
       title: media.title,
+      caption: media.caption,
+      tags: media.tags,
+      themes: media.themes,
       createdAt: media.createdAt,
     })
     .from(media)
@@ -46,6 +49,8 @@ export async function GET(_request: Request, { params }: Params) {
     avatarUrl: contributor.avatarUrl,
     media: rows.map((row) => ({
       ...row,
+      tags: row.tags || [],
+      themes: row.themes || [],
       previewUrl: playableUrl(row.posterUrl || row.blobUrl),
       isAvatar: Boolean(
         contributor.avatarUrl && contributor.avatarUrl === row.blobUrl,

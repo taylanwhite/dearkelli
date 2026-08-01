@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PersonBubble } from "@/components/PersonBubble";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { SearchBox } from "@/components/SearchBox";
 import { playableUrl } from "@/lib/blob";
 import { getPeople, searchAll } from "@/lib/queries";
@@ -94,22 +95,20 @@ export default async function SearchPage({ searchParams }: Props) {
           )}
 
           {results.photos.length > 0 && (
-            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {results.photos.map((photo) => (
-                <li key={photo.id} className="overflow-hidden rounded-2xl">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={playableUrl(photo.posterUrl || photo.blobUrl)}
-                    alt={
-                      photo.caption ||
-                      photo.title ||
-                      `From ${photo.contributorName}`
-                    }
-                    className="aspect-square w-full object-cover"
-                  />
-                </li>
-              ))}
-            </ul>
+            <PhotoLightbox
+              layout="grid"
+              showAttribution={false}
+              photos={results.photos.map((photo) => ({
+                id: photo.id,
+                src: playableUrl(photo.posterUrl || photo.blobUrl),
+                alt:
+                  photo.caption ||
+                  photo.title ||
+                  `From ${photo.contributorName}`,
+                caption: photo.caption || photo.title,
+                contributorName: photo.contributorName,
+              }))}
+            />
           )}
         </div>
       )}

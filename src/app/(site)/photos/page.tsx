@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PersonBubble } from "@/components/PersonBubble";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { playableUrl } from "@/lib/blob";
 import { getPeople, getPhotos } from "@/lib/queries";
 
@@ -60,31 +61,23 @@ export default async function PhotosPage({ searchParams }: Props) {
           Nothing here yet. Give them a little time.
         </p>
       ) : (
-        <ul className="mt-10 columns-1 gap-5 sm:columns-2 md:columns-3">
-          {photos.map((photo) => (
-            <li key={photo.id} className="mb-5 break-inside-avoid">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={playableUrl(photo.posterUrl || photo.blobUrl)}
-                alt={
-                  photo.caption ||
-                  photo.title ||
-                  `From ${photo.contributorName}`
-                }
-                className="w-full rounded-2xl object-cover"
-              />
-              <div className="mt-3">
-                <PersonBubble
-                  id={photo.contributorId}
-                  name={photo.contributorName}
-                  avatarUrl={photo.avatarUrl}
-                  size="sm"
-                  layout="row"
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
+        <div className="mt-10">
+          <PhotoLightbox
+            layout="masonry"
+            photos={photos.map((photo) => ({
+              id: photo.id,
+              src: playableUrl(photo.posterUrl || photo.blobUrl),
+              alt:
+                photo.caption ||
+                photo.title ||
+                `From ${photo.contributorName}`,
+              caption: photo.caption || photo.title,
+              contributorId: photo.contributorId,
+              contributorName: photo.contributorName,
+              avatarUrl: photo.avatarUrl,
+            }))}
+          />
+        </div>
       )}
     </main>
   );

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   contributors,
@@ -56,7 +56,13 @@ export async function getWordOccurrences(normalized: string) {
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
     .innerJoin(contributors, eq(words.contributorId, contributors.id))
-    .where(and(eq(words.normalized, normalized), eq(media.status, "ready")))
+    .where(
+      and(
+        eq(words.normalized, normalized),
+        eq(media.status, "ready"),
+        eq(words.source, "speech"),
+      ),
+    )
     .orderBy(contributors.name, words.startMs);
 }
 
@@ -118,6 +124,26 @@ export async function getPerson(id: string) {
     .where(and(eq(media.contributorId, id), eq(media.status, "ready")))
     .orderBy(desc(media.createdAt));
 
+  // Profile portraits are for the circle only, not the album.
+  const albumClips = clips.filter(
+    (clip) =>
+      !(
+        clip.kind === "image" &&
+        person.avatarUrl &&
+        clip.blobUrl === person.avatarUrl
+      ),
+  );
+
+  const topWordConditions = [
+    eq(words.contributorId, id),
+    eq(media.status, "ready"),
+  ];
+  if (person.avatarUrl) {
+    topWordConditions.push(
+      or(ne(media.blobUrl, person.avatarUrl), ne(media.kind, "image"))!,
+    );
+  }
+
   const topWords = await db
     .select({
       normalized: words.normalized,
@@ -125,16 +151,21 @@ export async function getPerson(id: string) {
     })
     .from(words)
     .innerJoin(media, eq(words.mediaId, media.id))
-    .where(and(eq(words.contributorId, id), eq(media.status, "ready")))
+    .where(and(...topWordConditions))
     .groupBy(words.normalized)
     .orderBy(desc(sql`count(*)`))
     .limit(24);
 
-  return { person, clips, topWords };
+  return { person, clips: albumClips, topWords };
 }
 
 export async function getPhotos(contributorId?: string) {
-  const conditions = [eq(media.kind, "image"), eq(media.status, "ready")];
+  const conditions = [
+    eq(media.kind, "image"),
+    eq(media.status, "ready"),
+    // Hide profile portraits from the album
+    or(isNull(contributors.avatarUrl), ne(media.blobUrl, contributors.avatarUrl)),
+  ];
   if (contributorId) {
     conditions.push(eq(media.contributorId, contributorId));
   }
@@ -224,6 +255,10 @@ export async function searchAll(query: string) {
           and(
             eq(media.kind, "image"),
             eq(media.status, "ready"),
+            or(
+              isNull(contributors.avatarUrl),
+              ne(media.blobUrl, contributors.avatarUrl),
+            ),
             or(
               ilike(media.caption, pattern),
               ilike(media.title, pattern),

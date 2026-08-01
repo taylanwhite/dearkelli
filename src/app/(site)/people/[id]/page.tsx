@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonBubble } from "@/components/PersonBubble";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { playableUrl } from "@/lib/blob";
 import { getPerson } from "@/lib/queries";
 
@@ -92,18 +93,17 @@ export default async function PersonPage({ params }: Props) {
 
       {photos.length > 0 && (
         <section className="mt-16">
-          <ul className="grid grid-cols-2 gap-3">
-            {photos.map((photo) => (
-              <li key={photo.id} className="overflow-hidden rounded-2xl">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={playableUrl(photo.posterUrl || photo.blobUrl)}
-                  alt={photo.caption || `From ${person.name}`}
-                  className="aspect-square w-full object-cover"
-                />
-              </li>
-            ))}
-          </ul>
+          <PhotoLightbox
+            layout="grid"
+            showAttribution={false}
+            photos={photos.map((photo) => ({
+              id: photo.id,
+              src: playableUrl(photo.posterUrl || photo.blobUrl),
+              alt: photo.caption || `From ${person.name}`,
+              caption: photo.caption || photo.title,
+              contributorName: person.name,
+            }))}
+          />
         </section>
       )}
     </main>

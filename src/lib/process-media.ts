@@ -292,9 +292,9 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
   });
 
   const enrichment = await enrichImage(openai, oriented);
-  const allThemes = [
-    ...new Set([...(enrichment.themes || []), ...(enrichment.tags || [])]),
-  ].slice(0, 16);
+  const priorTags = item.tags || [];
+  const tags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
+  const themes = (enrichment.themes || []).slice(0, 3);
 
   await db.delete(words).where(eq(words.mediaId, item.id));
   await db.delete(phrases).where(eq(phrases.mediaId, item.id));
@@ -310,8 +310,8 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
     })
     .returning();
 
-  // Photos: only curated warm AI tags go into the cloud (not every caption noun).
-  const fromTags = tagWordsFromList(enrichment.tags).filter(
+  // Photos: only curated warm tags go into the cloud (not every caption noun).
+  const fromTags = tagWordsFromList(tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
 
@@ -325,6 +325,7 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
         normalized: w.normalized,
         startMs: w.startMs,
         endMs: w.endMs,
+        source: "tag",
       })),
     );
   }
@@ -339,7 +340,8 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
       caption: enrichment.caption,
       title: enrichment.title,
       summary: enrichment.caption,
-      themes: allThemes,
+      themes,
+      tags: tags.length ? tags : null,
       status: "ready",
     })
     .where(eq(media.id, item.id));
@@ -452,7 +454,10 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       };
 
   // Merge AI tags into word cloud (no supercut moments; timestamps already from speech)
-  const aiTagWords = tagWordsFromList(enrichment.tags).filter(
+  const priorTags = item.tags || [];
+  const tags = filterWarmAiTags([...priorTags, ...(enrichment.tags || [])]);
+  const themes = (enrichment.themes || []).slice(0, 3);
+  const aiTagWords = tagWordsFromList(tags).filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
   );
   const spokenNormalized = new Set(kept.map((w) => w.normalized));
@@ -471,10 +476,9 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     })
     .returning();
 
-  const wordRows = [...kept, ...extraTags];
-  if (wordRows.length > 0) {
+  if (kept.length > 0) {
     await db.insert(words).values(
-      wordRows.map((w) => ({
+      kept.map((w) => ({
         transcriptId: transcriptRow.id,
         mediaId: item.id,
         contributorId: item.contributorId,
@@ -482,6 +486,22 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         normalized: w.normalized,
         startMs: w.startMs,
         endMs: w.endMs,
+        source: "speech",
+      })),
+    );
+  }
+
+  if (extraTags.length > 0) {
+    await db.insert(words).values(
+      extraTags.map((w) => ({
+        transcriptId: transcriptRow.id,
+        mediaId: item.id,
+        contributorId: item.contributorId,
+        raw: w.raw,
+        normalized: w.normalized,
+        startMs: w.startMs,
+        endMs: w.endMs,
+        source: "tag",
       })),
     );
   }
@@ -498,10 +518,6 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     );
   }
 
-  const allThemes = [
-    ...new Set([...(enrichment.themes || []), ...(enrichment.tags || [])]),
-  ].slice(0, 16);
-
   await db
     .update(media)
     .set({
@@ -510,7 +526,8 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
       posterUrl,
       title: enrichment.title,
       summary: enrichment.summary,
-      themes: allThemes,
+      themes,
+      tags: tags.length ? tags : null,
     })
     .where(eq(media.id, item.id));
 }

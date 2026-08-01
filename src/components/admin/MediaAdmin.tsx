@@ -14,6 +14,7 @@ export type AdminMediaItem = {
   originalFilename: string | null;
   durationSeconds: number | null;
   themes: string[] | null;
+  tags: string[] | null;
   caption: string | null;
   isTest: boolean;
   createdAt: string | Date;
@@ -103,59 +104,90 @@ export function MediaAdmin({ initialMedia }: Props) {
       {visible.length === 0 ? (
         <p className="text-[var(--cream)]/45">Nothing in this view.</p>
       ) : (
-        <ul className="space-y-3">
-          {visible.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] px-4 py-4"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
-                      {item.kind}
+        <ul className="space-y-4">
+          {visible.map((item) => {
+            const tags = item.tags || [];
+            const themes = item.themes || [];
+            return (
+              <li
+                key={item.id}
+                className="rounded-2xl border border-[var(--forest)]/10 bg-[var(--surface)] p-4"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-[var(--forest)]/5 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--cream)]/50">
+                    {item.kind}
+                  </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
+                      item.status === "ready"
+                        ? "bg-[var(--gold)]/20 text-[var(--gold)]"
+                        : item.status === "failed"
+                          ? "bg-[var(--forest)]/20 text-[var(--forest)]"
+                          : "bg-[var(--forest)]/10 text-[var(--cream)]/60"
+                    }`}
+                  >
+                    {item.status}
+                  </span>
+                  {item.isTest && (
+                    <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--gold)]">
+                      test
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[11px] uppercase tracking-wide ${
-                        item.status === "ready"
-                          ? "bg-[var(--gold)]/20 text-[var(--gold)]"
-                          : item.status === "failed"
-                            ? "bg-[var(--forest)]/20 text-[var(--forest)]"
-                            : "bg-[var(--forest)]/10 text-[var(--cream)]/60"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                    {item.isTest && (
-                      <span className="rounded-full bg-[var(--gold)]/20 px-2 py-0.5 text-[11px] uppercase tracking-wide text-[var(--gold)]">
-                        test
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-[var(--cream)]">
-                    {item.title || item.originalFilename || "Untitled"}
-                  </p>
-                  <p className="text-sm text-[var(--cream)]/45">
-                    {item.contributorName}
-                    {item.durationSeconds
-                      ? ` · ${item.durationSeconds}s`
-                      : ""}
-                  </p>
-                  {(item.summary || item.caption) && (
-                    <p className="mt-2 line-clamp-2 text-sm text-[var(--cream)]/40">
-                      {item.summary || item.caption}
-                    </p>
                   )}
-                  <p className="mt-2 font-mono text-[11px] text-[var(--cream)]/25">
-                    {item.id}
-                  </p>
                 </div>
-                <div className="flex flex-wrap gap-2 sm:justify-end">
+
+                <p className="mt-3 text-[var(--cream)]">
+                  {item.title || item.originalFilename || "Untitled"}
+                </p>
+                <p className="text-sm text-[var(--cream)]/45">
+                  {item.contributorName}
+                  {item.durationSeconds ? ` · ${item.durationSeconds}s` : ""}
+                </p>
+
+                {(item.summary || item.caption) && (
+                  <p className="mt-2 text-sm leading-relaxed text-[var(--cream)]/55">
+                    {item.summary || item.caption}
+                  </p>
+                )}
+
+                {themes.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--cream)]/35">
+                      Themes
+                    </p>
+                    <p className="mt-1 text-sm text-[var(--cream)]/60">
+                      {themes.join(" · ")}
+                    </p>
+                  </div>
+                )}
+
+                {tags.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-[11px] uppercase tracking-wide text-[var(--cream)]/35">
+                      Word tags
+                    </p>
+                    <ul className="mt-2 flex flex-wrap gap-1.5">
+                      {tags.map((tag) => (
+                        <li
+                          key={tag}
+                          className="rounded-full bg-[var(--forest)]/8 px-2.5 py-1 text-xs text-[var(--cream)]/70"
+                        >
+                          {tag}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <p className="mt-3 font-mono text-[11px] text-[var(--cream)]/25">
+                  {item.id}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--forest)]/10 pt-4">
                   <a
                     href={`/api/media/stream?url=${encodeURIComponent(item.blobUrl)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
+                    className="inline-flex min-h-9 items-center rounded-full border border-[var(--forest)]/15 px-4 text-sm text-[var(--cream)]/75"
                   >
                     Open file
                   </a>
@@ -164,23 +196,23 @@ export function MediaAdmin({ initialMedia }: Props) {
                       type="button"
                       disabled={busyId === item.id}
                       onClick={() => requeue(item.id)}
-                      className="rounded-full border border-[var(--forest)]/15 px-3 py-1.5 text-xs text-[var(--cream)]/75"
+                      className="inline-flex min-h-9 items-center rounded-full border border-[var(--forest)]/15 px-4 text-sm text-[var(--cream)]/75 disabled:opacity-50"
                     >
-                      Requeue process
+                      Requeue
                     </button>
                   )}
                   <button
                     type="button"
                     disabled={busyId === item.id}
                     onClick={() => remove(item.id)}
-                    className="rounded-full border border-[var(--forest)]/40 px-3 py-1.5 text-xs text-[var(--forest)]"
+                    className="inline-flex min-h-9 items-center rounded-full border border-[var(--forest)]/35 px-4 text-sm text-[var(--forest)] disabled:opacity-50"
                   >
                     Delete
                   </button>
                 </div>
-              </div>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -44,19 +44,19 @@ export async function POST(request: Request) {
       .limit(1);
 
     const kind = kindFromMime(parsed.contentType, parsed.filename);
-    const shouldSetAvatar =
-      Boolean(parsed.asAvatar) ||
-      (kind === "image" && !contributor.avatarUrl);
+
+    // Profile portraits are circle-only; never add them to the album.
+    if (parsed.asAvatar) {
+      await db
+        .update(contributors)
+        .set({ avatarUrl: parsed.blobUrl })
+        .where(eq(contributors.id, contributor.id));
+      return NextResponse.json({ avatar: true });
+    }
 
     if (existing[0]) {
       if (existing[0].status === "uploaded" || existing[0].status === "failed") {
         scheduleMediaProcessing(existing[0].id);
-      }
-      if (shouldSetAvatar && kind === "image") {
-        await db
-          .update(contributors)
-          .set({ avatarUrl: parsed.blobUrl })
-          .where(eq(contributors.id, contributor.id));
       }
       return NextResponse.json({ id: existing[0].id, deduped: true });
     }
@@ -76,13 +76,6 @@ export async function POST(request: Request) {
           : null,
       })
       .returning({ id: media.id });
-
-    if (shouldSetAvatar && kind === "image") {
-      await db
-        .update(contributors)
-        .set({ avatarUrl: parsed.blobUrl })
-        .where(eq(contributors.id, contributor.id));
-    }
 
     scheduleMediaProcessing(row.id);
 

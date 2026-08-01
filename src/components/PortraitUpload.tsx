@@ -54,16 +54,11 @@ export function PortraitUpload({ token, initialUrl, onUploaded }: Props) {
         }),
       });
 
-      const res = await fetch("/api/media", {
-        method: "POST",
+      // Portrait is only for their circle, not the photo album.
+      const res = await fetch(`/api/contributor/${token}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          blobUrl: blob.url,
-          contentType: file.type || "image/jpeg",
-          filename: file.name,
-          asAvatar: true,
-        }),
+        body: JSON.stringify({ avatarUrl: blob.url }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
