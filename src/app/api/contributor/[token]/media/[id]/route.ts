@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { contributors, media } from "@/db/schema";
 import { syncMediaTags } from "@/lib/sync-tags";
+import { correctKelliSpelling } from "@/lib/words";
 
 export const runtime = "nodejs";
 
@@ -68,7 +69,9 @@ export async function PATCH(request: Request, { params }: Params) {
         );
       }
 
-      const note = body.summary?.trim() ? body.summary.trim().slice(0, 280) : null;
+      const note = body.summary?.trim()
+        ? correctKelliSpelling(body.summary.trim().slice(0, 280))
+        : null;
       await db
         .update(media)
         .set(

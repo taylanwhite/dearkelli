@@ -1,4 +1,7 @@
 import lemmatizer from "wink-lemmatizer";
+import { canonicalizeKelliToken } from "@/lib/kelli-spelling";
+
+export { canonicalizeKelliToken, correctKelliSpelling } from "@/lib/kelli-spelling";
 
 /** Stopwords we drop; keep the emotional ones via ALLOWLIST. */
 const STOPWORDS = new Set([
@@ -142,7 +145,7 @@ const ALLOWLIST = new Set([
   "together",
   "everything",
   "kelli",
-  "kelly",
+  // "kelly" is a common misspelling of her name — corrected via correctKelliSpelling
 ]);
 
 export const THEME_TAGS = [
@@ -357,7 +360,6 @@ const CLOUD_WORDS = new Set([
   "neighbor",
   "neighbour",
   "kelli",
-  "kelly",
   // Everyday affection words that still belong
   "miss",
   "wish",
@@ -572,7 +574,7 @@ const CLOUD_BLOCKLIST = new Set([
 /** Whether a normalized token belongs on the public word cloud. */
 export function isCloudWorthyWord(normalized: string | null | undefined): boolean {
   if (!normalized) return false;
-  const w = normalized.toLowerCase().trim();
+  const w = canonicalizeKelliToken(normalized.toLowerCase().trim());
   if (w.length < 3 || w.length > 18) return false;
   if (CLOUD_BLOCKLIST.has(w)) return false;
   return CLOUD_WORDS.has(w);
@@ -587,13 +589,17 @@ export function filterWarmAiTags(tags: string[]): string[] {
   const out: string[] = [];
 
   for (const raw of tags) {
-    const cleaned = raw
-      .toLowerCase()
-      .trim()
-      .replace(/[^\p{L}\p{N}]+/gu, "");
+    const cleaned = canonicalizeKelliToken(
+      raw
+        .toLowerCase()
+        .trim()
+        .replace(/[^\p{L}\p{N}]+/gu, ""),
+    );
     if (!cleaned) continue;
 
-    const normalized = normalizeWord(cleaned) || cleaned;
+    const normalized = canonicalizeKelliToken(
+      normalizeWord(cleaned) || cleaned,
+    );
     if (!isCloudWorthyWord(normalized) && !isCloudWorthyWord(cleaned)) {
       continue;
     }
@@ -641,10 +647,10 @@ export function lemmatizeWord(word: string): string {
 }
 
 export function normalizeWord(raw: string): string | null {
-  const cleaned = stripPunctuation(raw);
+  const cleaned = canonicalizeKelliToken(stripPunctuation(raw));
   if (!cleaned || cleaned.length < 2) return null;
 
-  const lemma = lemmatizeWord(cleaned);
+  const lemma = canonicalizeKelliToken(lemmatizeWord(cleaned));
 
   if (ALLOWLIST.has(lemma) || ALLOWLIST.has(cleaned)) return lemma;
   if (STOPWORDS.has(lemma) || STOPWORDS.has(cleaned)) return null;

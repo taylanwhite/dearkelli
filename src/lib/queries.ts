@@ -7,7 +7,8 @@ import {
   transcripts,
   words,
 } from "@/db/schema";
-import { isCloudWorthyWord } from "@/lib/words";
+import { isCloudWorthyWord, canonicalizeKelliToken } from "@/lib/words";
+import { correctKelliSpelling } from "@/lib/kelli-spelling";
 
 export async function getWordStats() {
   const rows = await db
@@ -29,11 +30,36 @@ export async function getWordStats() {
     .groupBy(words.normalized)
     .orderBy(desc(sql`count(*)`));
 
-  return rows.filter((w) => isCloudWorthyWord(w.normalized));
+  // Merge the common "kelly" misspelling into canonical "kelli".
+  const merged = new Map<
+    string,
+    {
+      normalized: string;
+      totalCount: number;
+      contributorCount: number;
+      mediaCount: number;
+    }
+  >();
+  for (const row of rows) {
+    const key = canonicalizeKelliToken(row.normalized);
+    if (!isCloudWorthyWord(key)) continue;
+    const prev = merged.get(key);
+    if (!prev) {
+      merged.set(key, { ...row, normalized: key });
+    } else {
+      prev.totalCount += row.totalCount;
+      prev.contributorCount += row.contributorCount;
+      prev.mediaCount += row.mediaCount;
+    }
+  }
+
+  return Array.from(merged.values()).sort(
+    (a, b) => b.totalCount - a.totalCount,
+  );
 }
 
 export async function getPhraseStats() {
-  return db
+  const rows = await db
     .select({
       text: phrases.text,
       totalCount: sql<number>`count(*)::int`,
@@ -43,9 +69,23 @@ export async function getPhraseStats() {
     .where(eq(media.status, "ready"))
     .groupBy(phrases.text)
     .orderBy(desc(sql`count(*)`));
+
+  const merged = new Map<string, { text: string; totalCount: number }>();
+  for (const row of rows) {
+    const text = correctKelliSpelling(row.text);
+    const prev = merged.get(text);
+    if (prev) prev.totalCount += row.totalCount;
+    else merged.set(text, { text, totalCount: row.totalCount });
+  }
+  return Array.from(merged.values()).sort(
+    (a, b) => b.totalCount - a.totalCount,
+  );
 }
 
 export async function getWordOccurrences(normalized: string) {
+  const key = canonicalizeKelliToken(normalized);
+  const aliases = key === "kelli" ? ["kelli", "kelly"] : [key];
+
   return db
     .select({
       wordId: words.id,
@@ -72,7 +112,7 @@ export async function getWordOccurrences(normalized: string) {
     .innerJoin(contributors, eq(words.contributorId, contributors.id))
     .where(
       and(
-        eq(words.normalized, normalized),
+        inArray(words.normalized, aliases),
         eq(media.status, "ready"),
         inArray(words.source, ["speech", "tag"]),
       ),
@@ -197,10 +237,28 @@ export async function getPerson(id: string) {
       .orderBy(desc(sql`count(*)`))
       .limit(80)
   )
+    .map((w) => ({
+      ...w,
+      normalized: canonicalizeKelliToken(w.normalized),
+    }))
     .filter((w) => isCloudWorthyWord(w.normalized))
-    .slice(0, 24);
+    .reduce(
+      (acc, w) => {
+        const prev = acc.get(w.normalized);
+        if (prev) prev.totalCount += w.totalCount;
+        else acc.set(w.normalized, { ...w });
+        return acc;
+      },
+      new Map<string, { normalized: string; totalCount: number }>(),
+    );
 
-  return { person, clips: albumWithCaptions, topWords };
+  return {
+    person,
+    clips: albumWithCaptions,
+    topWords: Array.from(topWords.values())
+      .sort((a, b) => b.totalCount - a.totalCount)
+      .slice(0, 24),
+  };
 }
 
 export async function getPhotos(contributorId?: string) {

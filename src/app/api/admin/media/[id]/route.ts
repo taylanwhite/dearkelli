@@ -4,6 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { media, phrases, transcripts, words } from "@/db/schema";
 import { scheduleMediaProcessing } from "@/lib/enqueue-process";
+import { correctKelliSpelling } from "@/lib/words";
 
 export const runtime = "nodejs";
 
@@ -47,9 +48,18 @@ export async function PATCH(request: Request, { params }: Params) {
         processingError: body.requeue
           ? null
           : existing.processingError,
-        title: body.title === undefined ? existing.title : body.title,
+        title:
+          body.title === undefined
+            ? existing.title
+            : body.title === null
+              ? null
+              : correctKelliSpelling(body.title),
         summary:
-          body.summary === undefined ? existing.summary : body.summary,
+          body.summary === undefined
+            ? existing.summary
+            : body.summary === null
+              ? null
+              : correctKelliSpelling(body.summary),
       })
       .where(eq(media.id, id))
       .returning();

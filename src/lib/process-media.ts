@@ -20,6 +20,7 @@ import { BLOB_ACCESS } from "@/lib/blob";
 import { isHeicLike } from "@/lib/media";
 import {
   THEME_TAGS,
+  correctKelliSpelling,
   detectPhrases,
   filterWarmAiTags,
   isCloudWorthyWord,
@@ -30,7 +31,8 @@ import {
 const AI_TAG_GUIDANCE = `Word-cloud tags must be ONLY happy, thoughtful, loving keepsake words — feelings, virtues, gratitude, family bonds, joy.
 Never dump random words from the soundtrack or scene. Never negatives, body/sense words, objects, fillers, or baby-talk noise.
 Good: love, laughter, grateful, family, sunshine, brave, forever, proud, gentle, heart, home, joy, always, together
-Bad: smell, baby, hurt, robot, car, phone, crazy, hey, ready, go, wall, crying, sad, outdoor, person`;
+Bad: smell, baby, hurt, robot, car, phone, crazy, hey, ready, go, wall, crying, sad, outdoor, person
+Her name is spelled Kelli (not Kelly). Always use Kelli.`;
 
 function getOpenAI() {
   const key = process.env.OPENAI_API_KEY;
@@ -66,7 +68,7 @@ async function curateThemeFitTags(
       messages: [
         {
           role: "system",
-          content: `You curate words for a loving keepsake word cloud made for a woman named Kelli.
+          content: `You curate words for a loving keepsake word cloud made for a woman named Kelli (spelled Kelli, never Kelly).
 You are given what one memory (a photo or video) is actually about, plus a list of candidate words.
 Keep only the words that BOTH feel warm/tender/uplifting AND genuinely fit this specific memory.
 Drop anything off-tone, clinical, sad, or that doesn't reflect what this memory is about — even if the word itself is nice.
@@ -507,8 +509,10 @@ function parseTextEnrichment(raw: string, fallbackTitle: string): TextEnrichment
     );
     const tags = filterWarmAiTags(parsed.tags || []);
     return {
-      title: parsed.title?.slice(0, 80) || fallbackTitle,
-      summary: parsed.summary?.slice(0, 400) || null,
+      title: correctKelliSpelling(parsed.title?.slice(0, 80) || fallbackTitle),
+      summary: parsed.summary
+        ? correctKelliSpelling(parsed.summary.slice(0, 400))
+        : null,
       themes: themes.slice(0, 3),
       tags,
     };
@@ -531,6 +535,7 @@ async function enrichFromText(openai: OpenAI, fullText: string) {
       {
         role: "system",
         content: `You label a spoken message or video soundtrack for Kelli's keepsake.
+Her name is spelled Kelli (never Kelly).
 
 Rules for title and summary:
 - Stay faithful to what was actually said. No invented scenes, no invented praise.
@@ -568,6 +573,7 @@ async function enrichVideo(
     {
       type: "text",
       text: `This is a keepsake video for Kelli.
+Her name is spelled Kelli (never Kelly).
 
 Rules for title and summary:
 - Describe the real scene. Stay concrete. No invented praise or poetic fluff.
@@ -629,6 +635,7 @@ async function enrichImage(
           {
             type: "text",
             text: `This photo is a keepsake for Kelli.
+Her name is spelled Kelli (never Kelly).
 
 Rules for title and caption:
 - Describe what is actually in the photo. Stay concrete.
@@ -664,8 +671,12 @@ Return JSON:
     );
     const tags = filterWarmAiTags(parsed.tags || []);
     return {
-      title: parsed.title?.slice(0, 80) || "A photo for Kelli",
-      caption: parsed.caption?.slice(0, 400) || null,
+      title: correctKelliSpelling(
+        parsed.title?.slice(0, 80) || "A photo for Kelli",
+      ),
+      caption: parsed.caption
+        ? correctKelliSpelling(parsed.caption.slice(0, 400))
+        : null,
       themes: themes.length ? themes.slice(0, 3) : (["tender"] as string[]),
       tags,
     };
@@ -682,9 +693,10 @@ Return JSON:
 function tagWordsFromList(tags: string[]): TimedWord[] {
   return tags
     .map((tag, i) => {
-      const normalized = normalizeWord(tag) || tag;
+      const corrected = correctKelliSpelling(tag);
+      const normalized = normalizeWord(corrected) || corrected;
       return {
-        raw: tag,
+        raw: corrected,
         normalized,
         startMs: i * 10,
         endMs: i * 10 + 5,
@@ -756,7 +768,9 @@ async function processImage(item: Media, workDir: string, openai: OpenAI) {
   await db.delete(phrases).where(eq(phrases.mediaId, item.id));
   await db.delete(transcripts).where(eq(transcripts.mediaId, item.id));
 
-  const captionText = enrichment.caption || enrichment.title;
+  const captionText = correctKelliSpelling(
+    enrichment.caption || enrichment.title,
+  );
   const [transcriptRow] = await db
     .insert(transcripts)
     .values({
@@ -1001,12 +1015,15 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     return;
   }
 
-  const timed: TimedWord[] = (transcript.words || []).map((w) => ({
-    raw: w.word,
-    normalized: normalizeWord(w.word),
-    startMs: Math.round(w.start * 1000),
-    endMs: Math.round(w.end * 1000),
-  }));
+  const timed: TimedWord[] = (transcript.words || []).map((w) => {
+    const raw = correctKelliSpelling(w.word);
+    return {
+      raw,
+      normalized: normalizeWord(raw),
+      startMs: Math.round(w.start * 1000),
+      endMs: Math.round(w.end * 1000),
+    };
+  });
 
   const kept = timed.filter(
     (w): w is TimedWord & { normalized: string } => !!w.normalized,
@@ -1023,11 +1040,14 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
         /* poster may be missing */
       }
       enrichment = await enrichVideo(openai, {
-        transcriptText: transcript.text,
+        transcriptText: correctKelliSpelling(transcript.text),
         posterJpeg,
       });
     } else if (transcript.text.trim()) {
-      enrichment = await enrichFromText(openai, transcript.text);
+      enrichment = await enrichFromText(
+        openai,
+        correctKelliSpelling(transcript.text),
+      );
     } else {
       enrichment = {
         title: "A voice for Kelli",
@@ -1075,7 +1095,7 @@ async function processAv(item: Media, workDir: string, openai: OpenAI) {
     .insert(transcripts)
     .values({
       mediaId: item.id,
-      fullText: transcript.text,
+      fullText: correctKelliSpelling(transcript.text),
       language: transcript.language ?? null,
       // Full speech timings for captions — even words that never make the cloud.
       timedWords: timed

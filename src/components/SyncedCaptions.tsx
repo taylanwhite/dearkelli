@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { TimedCaptionWord } from "@/db/schema";
+import { correctKelliSpelling } from "@/lib/kelli-spelling";
 
 type Props = {
   words: TimedCaptionWord[];
@@ -50,8 +51,9 @@ export function SyncedCaptions({
         const isActive = i === idx;
         const isEmphasized =
           !!emphasizeNorm &&
-          w.raw.toLowerCase().replace(/[^\p{L}\p{N}']+/gu, "") ===
-            emphasizeNorm;
+          correctKelliSpelling(w.raw)
+            .toLowerCase()
+            .replace(/[^\p{L}\p{N}']+/gu, "") === emphasizeNorm;
         return (
           <span key={`${w.startMs}-${i}`}>
             {i > 0 ? " " : ""}
@@ -64,7 +66,7 @@ export function SyncedCaptions({
                     : undefined
               }
             >
-              {w.raw}
+              {correctKelliSpelling(w.raw)}
             </span>
           </span>
         );
